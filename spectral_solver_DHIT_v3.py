@@ -338,7 +338,7 @@ def fps(nx,ny,dx,dy,k2,f):
     data1 = f/(-k2)
     
     # compute the inverse fourier transform
-    u[0:nx,0:ny] = np.real(fft_object_inv(data1))
+    u[0:nx,0:ny] = np.real(np.fft.ifft2(data1))
     pbc(nx,ny,u)
     
     return u
@@ -453,10 +453,10 @@ def nonlineardealiased(nx,ny,kx,ky,k2,wf):
     fft_object_inv3 = pyfftw.FFTW(a3, b3,axes = (0,1), direction = 'FFTW_BACKWARD')
     fft_object_inv4 = pyfftw.FFTW(a4, b4,axes = (0,1), direction = 'FFTW_BACKWARD')
     
-    j1 = np.real(fft_object_inv1(j1f_padded))
-    j2 = np.real(fft_object_inv2(j2f_padded))
-    j3 = np.real(fft_object_inv3(j3f_padded))
-    j4 = np.real(fft_object_inv4(j4f_padded))
+    j1 = np.real(np.fft.ifft2(j1f_padded))
+    j2 = np.real(np.fft.ifft2(j2f_padded))
+    j3 = np.real(np.fft.ifft2(j3f_padded))
+    j4 = np.real(np.fft.ifft2(j4f_padded))
     
     jacp = j1*j2 - j3*j4
     
