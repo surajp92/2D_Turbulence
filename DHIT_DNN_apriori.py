@@ -2,7 +2,7 @@
 """
 Created on Sat May 25 14:51:02 2019
 
-@author: arash
+@author: Suraj Pawar
 """
 
 import numpy as np
@@ -12,6 +12,7 @@ from keras.layers import Dense, Dropout, Input
 from keras.callbacks import ModelCheckpoint
 from keras.utils import plot_model
 from scipy.stats import norm 
+from keras import backend as K
 
 #%%
 #Class of problem to solve 2D decaying homogeneous isotrpic turbulence
@@ -31,7 +32,7 @@ class DHIT:
         self.nx = nx
         self.ny = ny
         self.n_snapshots = n_snapshots
-        self.f_train,self.ue_train,self.f_test,self.ue_test = self.gen_data()
+        self.x_train,self.y_train,self.x_test,self.y_test = self.gen_data()
         
     def gen_data(self):
         
@@ -39,70 +40,74 @@ class DHIT:
         data generation for training and testing CNN model
 
         '''
+        n_snapshots_test = 10
+        n_snapshots_train = self.n_snapshots - n_snapshots_test 
+               
+        for m in range(1,n_snapshots_train):
+            file_input = "spectral/Re_4000/uc/uc_"+str(m)+".csv"
+            data_input = np.genfromtxt(file_input, delimiter=',')
+            
+            nx,ny = data_input.shape
+            nt = int((nx-2)*(ny-2))
+            
+            x_t = np.zeros((nt,9))
+            y_t = np.zeros((nt,1))
+            
+            n = 0
+            for i in range(1,nx-1):
+                for j in range(1,ny-1):
+                    x_t[n,0] = data_input[i,j]
+                    x_t[n,1] = data_input[i,j-1]
+                    x_t[n,2] = data_input[i,j+1]
+                    x_t[n,3] = data_input[i-1,j]
+                    x_t[n,4] = data_input[i+1,j]
+                    x_t[n,5] = data_input[i-1,j-1]
+                    x_t[n,6] = data_input[i-1,j+1]
+                    x_t[n,7] = data_input[i+1,j-1]
+                    x_t[n,8] = data_input[i+1,j+1]
+                    y_t[n,0] = data_input[i,j]
+                    n = n+1
+            
+            if m == 1:
+                x_train = x_t
+                y_train = y_t
+            else:
+                x_train = np.vstack((x_train,x_t))
+                y_train = np.vstack((y_train,y_t))
         
-        n_snapshots_train = self.n_snapshots #- 10
-        n_snapshots_test = 50
+        for m in range(n_snapshots_train,self.n_snapshots):
+            file_input = "spectral/Re_4000/uc/uc_"+str(m)+".csv"
+            data_input = np.genfromtxt(file_input, delimiter=',')
+            
+            nx,ny = data_input.shape
+            nt = int((nx-2)*(ny-2))
+            
+            x_t = np.zeros((nt,9))
+            y_t = np.zeros((nt,1))
+            
+            n = 0
+            for i in range(1,nx-1):
+                for j in range(1,ny-1):
+                    x_t[n,0] = data_input[i,j]
+                    x_t[n,1] = data_input[i,j-1]
+                    x_t[n,2] = data_input[i,j+1]
+                    x_t[n,3] = data_input[i-1,j]
+                    x_t[n,4] = data_input[i+1,j]
+                    x_t[n,5] = data_input[i-1,j-1]
+                    x_t[n,6] = data_input[i-1,j+1]
+                    x_t[n,7] = data_input[i+1,j-1]
+                    x_t[n,8] = data_input[i+1,j+1]
+                    y_t[n,0] = data_input[i,j]
+                    n = n+1
+            
+            if m == n_snapshots_train:
+                x_test = x_t
+                y_test = y_t
+            else:
+                x_test = np.vstack((x_test,x_t))
+                y_test = np.vstack((y_test,y_t))
         
-        f_train  = np.zeros(shape=(n_snapshots_train, self.nx+1, self.ny+1, 5), dtype='double')
-        ue_train = np.zeros(shape=(n_snapshots_train, self.nx+1, self.ny+1, 1), dtype='double')
-        
-        f_test  = np.zeros(shape=(n_snapshots_test, self.nx+1, self.ny+1, 5), dtype='double')
-        ue_test = np.zeros(shape=(n_snapshots_test, self.nx+1, self.ny+1, 1), dtype='double')
-        
-        for n in range(1,n_snapshots_train+1):
-            file_input = "spectral/Re_4000/uc/uc_"+str(n)+".csv"
-            data_input = np.genfromtxt(file_input, delimiter=',')
-            f_train[n-1,:,:,0] = data_input
-            
-            file_input = "spectral/Re_4000/vc/vc_"+str(n)+".csv"
-            data_input = np.genfromtxt(file_input, delimiter=',')
-            f_train[n-1,:,:,1] = data_input
-            
-            file_input = "spectral/Re_4000/uuc/uuc_"+str(n)+".csv"
-            data_input = np.genfromtxt(file_input, delimiter=',')
-            f_train[n-1,:,:,2] = data_input
-            
-            file_input = "spectral/Re_4000/uvc/uvc_"+str(n)+".csv"
-            data_input = np.genfromtxt(file_input, delimiter=',')
-            f_train[n-1,:,:,3] = data_input
-            
-            file_input = "spectral/Re_4000/vvc/vvc_"+str(n)+".csv"
-            data_input = np.genfromtxt(file_input, delimiter=',')
-            f_train[n-1,:,:,4] = data_input
-                       
-            file_output = "spectral/Re_4000/true_shear_stress/t_"+str(n)+".csv"
-            data_output = np.genfromtxt(file_output, delimiter=',')
-            data_output = data_output.reshape((3,self.nx+1,self.ny+1))
-            ue_train[n-1,:,:,0] = data_output[0,:,:] # tau_11
-            
-        for n in range(1,n_snapshots_test+1):
-            p = n #+ n_snapshots_train
-            file_input = "spectral/Re_8000/uc/uc_"+str(p)+".csv"
-            data_input = np.genfromtxt(file_input, delimiter=',')
-            f_test[n-1,:,:,0] = data_input
-            
-            file_input = "spectral/Re_8000/vc/vc_"+str(p)+".csv"
-            data_input = np.genfromtxt(file_input, delimiter=',')
-            f_test[n-1,:,:,1] = data_input
-            
-            file_input = "spectral/Re_8000/uuc/uuc_"+str(p)+".csv"
-            data_input = np.genfromtxt(file_input, delimiter=',')
-            f_test[n-1,:,:,2] = data_input
-            
-            file_input = "spectral/Re_8000/uvc/uvc_"+str(p)+".csv"
-            data_input = np.genfromtxt(file_input, delimiter=',')
-            f_test[n-1,:,:,3] = data_input
-            
-            file_input = "spectral/Re_8000/vvc/vvc_"+str(p)+".csv"
-            data_input = np.genfromtxt(file_input, delimiter=',')
-            f_test[n-1,:,:,4] = data_input
-                       
-            file_output = "spectral/Re_8000/true_shear_stress/t_"+str(p)+".csv"
-            data_output = np.genfromtxt(file_output, delimiter=',')
-            data_output = data_output.reshape((3,self.nx+1,self.ny+1))
-            ue_test[n-1,:,:,0] = data_output[0,:,:] # tau_11
-            
-        return f_train, ue_train, f_test, ue_test
+        return x_train, y_train, x_test, y_test
     
 #%%
 #A Convolutional Neural Network class
@@ -125,6 +130,11 @@ class DNN:
         self.nf = nf
         self.nl = nl
         self.model = self.DNN(x_train,y_train,nf,nl)
+    
+    def coeff_determination(self,y_true, y_pred):
+        SS_res =  K.sum(K.square( y_true-y_pred ))
+        SS_tot = K.sum(K.square( y_true - K.mean(y_true) ) )
+        return ( 1 - SS_res/(SS_tot + K.epsilon()) )
         
     def DNN(self,x_train,y_train,nf,nl):
         
@@ -148,10 +158,6 @@ class DNN:
         
         x = Dense(120, activation='relu',  use_bias=True)(input_layer)
         x = Dense(120, activation='relu',  use_bias=True)(x)
-        x = Dense(120, activation='relu',  use_bias=True)(x)
-        x = Dense(120, activation='relu',  use_bias=True)(x)
-        x = Dense(120, activation='relu',  use_bias=True)(x)
-        x = Dense(120, activation='relu',  use_bias=True)(x)
         
         output_layer = Dense(nl, activation='linear', use_bias=True)(x)
         
@@ -170,9 +176,9 @@ class DNN:
 
         '''
         
-        self.model.compile(loss='mean_squared_error', optimizer=optimizer, metrics=['accuracy'])
+        self.model.compile(loss='mean_squared_error', optimizer=optimizer, metrics=[self.coeff_determination])
         
-    def DNN_train(self,epochs,batch_size,filepath):
+    def DNN_train(self,epochs,batch_size):
         
         '''
         train the CNN model
@@ -187,7 +193,7 @@ class DNN:
         history_callback: return the loss history of CNN model training
         '''
         
-        filepath = filepath
+        filepath = "dnn_best_model.hd5"
         checkpoint = ModelCheckpoint(filepath, monitor='val_loss', verbose=1, save_best_only=True, mode='min')
         callbacks_list = [checkpoint]
         
@@ -215,7 +221,7 @@ class DNN:
         
         epochs = range(1, len(loss) + 1)
         plt.figure()
-        plt.semilogy(epochs, loss_, 'b', label='Training loss')
+        plt.semilogy(epochs, loss, 'b', label='Training loss')
         plt.semilogy(epochs, val_loss, 'r', label='Validation loss')
         plt.title('Training and validation loss')
         plt.legend()
@@ -254,25 +260,29 @@ class DNN:
 # generate training and testing data for CNN
 obj = DHIT(n_snapshots=50,nx=64,ny=64)
 
-x_train,y_train = obj.f_train,obj.ue_train
-x_test,y_test = obj.f_test,obj.ue_test
+x_train,y_train = obj.x_train,obj.y_train
+x_test,y_test = obj.x_test,obj.y_test
 
-nt,nx,ny,nci=x_train.shape
-nt,nx,ny,nco=y_train.shape 
+ns_train,nf = x_train.shape
+ns_train,nl = y_train.shape 
+
+indices = np.random.randint(0,x_train.shape[0],1000)
+x_train = x_train[indices]
+y_train = y_train[indices]
 
 #%%
 # train the CNN model and predict for the test data
-model=DNN(x_train,y_train,nx,ny,nci,nco)
-
+model=DNN(x_train,y_train,nf,nl)
 model.DNN_info()
-
 model.DNN_compile(optimizer='adam')
 
-history_callback = model.CNN_train(epochs=1000,batch_size=32,'dnn_best_model.hd5')
+#%%
+history_callback = model.DNN_train(epochs=300,batch_size=32)#,model_name="dnn_best_model.hd5")
 
-loss, val_loss = model.CNN_history(history_callback)
+#%%
+loss, val_loss = model.DNN_history(history_callback)
 
-y_test = model.DNN_predict(x_test)
+y_pred = model.DNN_predict(x_test)
 
 
 #%%
