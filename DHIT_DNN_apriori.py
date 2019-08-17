@@ -7,17 +7,25 @@ Created on Sat May 25 14:51:02 2019
 
 import numpy as np
 import matplotlib.pyplot as plt
-from keras.models import Sequential, Model
+from keras.models import Sequential, Model, load_model
 from keras.layers import Dense, Dropout, Input
 from keras.callbacks import ModelCheckpoint
 from keras.utils import plot_model
+from keras import optimizers
 from scipy.stats import norm 
 from keras import backend as K
+from sklearn.preprocessing import MinMaxScaler
+from numpy.random import seed
+seed(1)
+from tensorflow import set_random_seed
+set_random_seed(2)
+from sklearn.model_selection import train_test_split
+from keras.regularizers import l2
 
 #%%
 #Class of problem to solve 2D decaying homogeneous isotrpic turbulence
 class DHIT:
-    def __init__(self,n_snapshots,nx,ny):
+    def __init__(self,nx,ny,freq,n_snapshots):
         
         '''
         initialize the DHIT class
@@ -31,6 +39,7 @@ class DHIT:
         
         self.nx = nx
         self.ny = ny
+        self.freq = freq
         self.n_snapshots = n_snapshots
         self.x_train,self.y_train,self.x_test,self.y_test = self.gen_data()
         
@@ -40,32 +49,57 @@ class DHIT:
         data generation for training and testing CNN model
 
         '''
-        n_snapshots_test = 10
-        n_snapshots_train = self.n_snapshots - n_snapshots_test 
-               
-        for m in range(1,n_snapshots_train):
-            file_input = "spectral/Re_4000/uc/uc_"+str(m)+".csv"
-            data_input = np.genfromtxt(file_input, delimiter=',')
+        
+        for m in range(1,self.n_snapshots):
+            folder = "data_"+ str(1024) #+ "_V2" 
+#            file_input = "spectral/"+folder+"/00_wc/wc_"+str(m*self.freq)+".csv"
+#            uc = np.genfromtxt(file_input, delimiter=',')
+#            file_input = "spectral/"+folder+"/00_sc/sc_"+str(m*self.freq)+".csv"
+#            vc = np.genfromtxt(file_input, delimiter=',')
+#            file_input = "spectral/"+folder+"/00_sgs/sgs_"+str(m*self.freq)+".csv"
+#            sgs = np.genfromtxt(file_input, delimiter=',')
+            file_input = "spectral/"+folder+"/uc/uc_"+str(m*self.freq)+".csv"
+            uc = np.genfromtxt(file_input, delimiter=',')
+            file_input = "spectral/"+folder+"/vc/vc_"+str(m*self.freq)+".csv"
+            vc = np.genfromtxt(file_input, delimiter=',')
+            file_input = "spectral/"+folder+"/Sc/Sc_"+str(m*self.freq)+".csv"
+            S = np.genfromtxt(file_input, delimiter=',')
+            file_input = "spectral/"+folder+"/nu_true/nut_"+str(m*self.freq)+".csv"
+            nu = np.genfromtxt(file_input, delimiter=',')
+            nu = nu.reshape((3,self.nx+1,self.ny+1))
+            nu11 = nu[0,:,:]
+            nu12 = nu[1,:,:]
+            nu22 = nu[2,:,:]
+            file_input = "spectral/"+folder+"/true_shear_stress/t_"+str(m*self.freq)+".csv"
+            t = np.genfromtxt(file_input, delimiter=',')
+            t = t.reshape((3,self.nx+1,self.ny+1))
+            t11 = t[0,:,:]
+            t12 = t[1,:,:]
+            t22 = t[2,:,:]
             
-            nx,ny = data_input.shape
+            nx,ny = uc.shape
             nt = int((nx-2)*(ny-2))
             
-            x_t = np.zeros((nt,9))
-            y_t = np.zeros((nt,1))
+            x_t = np.zeros((nt,19))
+            y_t = np.zeros((nt,3))
             
             n = 0
             for i in range(1,nx-1):
                 for j in range(1,ny-1):
-                    x_t[n,0] = data_input[i,j]
-                    x_t[n,1] = data_input[i,j-1]
-                    x_t[n,2] = data_input[i,j+1]
-                    x_t[n,3] = data_input[i-1,j]
-                    x_t[n,4] = data_input[i+1,j]
-                    x_t[n,5] = data_input[i-1,j-1]
-                    x_t[n,6] = data_input[i-1,j+1]
-                    x_t[n,7] = data_input[i+1,j-1]
-                    x_t[n,8] = data_input[i+1,j+1]
-                    y_t[n,0] = data_input[i,j]
+                    x_t[n,0],x_t[n,9] = uc[i,j], vc[i,j]
+                    x_t[n,1],x_t[n,10] = uc[i,j-1], vc[i,j-1]
+                    x_t[n,2],x_t[n,11] = uc[i,j+1], vc[i,j+1]
+                    x_t[n,3],x_t[n,12] = uc[i-1,j], vc[i-1,j]
+                    x_t[n,4],x_t[n,13] = uc[i+1,j], vc[i+1,j]
+                    x_t[n,5],x_t[n,14] = uc[i-1,j-1], vc[i-1,j-1]
+                    x_t[n,6],x_t[n,15] = uc[i-1,j+1], vc[i-1,j+1]
+                    x_t[n,7],x_t[n,16] = uc[i+1,j-1], vc[i+1,j-1]
+                    x_t[n,8],x_t[n,17] = uc[i+1,j+1], vc[i+1,j+1]
+                    x_t[n,18] = S[i,j]
+                    
+                    y_t[n,0] = t11[i,j]
+                    y_t[n,1] = t12[i,j]
+                    y_t[n,2] = t22[i,j]
                     n = n+1
             
             if m == 1:
@@ -75,44 +109,66 @@ class DHIT:
                 x_train = np.vstack((x_train,x_t))
                 y_train = np.vstack((y_train,y_t))
         
-        for m in range(n_snapshots_train,self.n_snapshots):
-            file_input = "spectral/Re_4000/uc/uc_"+str(m)+".csv"
-            data_input = np.genfromtxt(file_input, delimiter=',')
-            
-            nx,ny = data_input.shape
-            nt = int((nx-2)*(ny-2))
-            
-            x_t = np.zeros((nt,9))
-            y_t = np.zeros((nt,1))
-            
-            n = 0
-            for i in range(1,nx-1):
-                for j in range(1,ny-1):
-                    x_t[n,0] = data_input[i,j]
-                    x_t[n,1] = data_input[i,j-1]
-                    x_t[n,2] = data_input[i,j+1]
-                    x_t[n,3] = data_input[i-1,j]
-                    x_t[n,4] = data_input[i+1,j]
-                    x_t[n,5] = data_input[i-1,j-1]
-                    x_t[n,6] = data_input[i-1,j+1]
-                    x_t[n,7] = data_input[i+1,j-1]
-                    x_t[n,8] = data_input[i+1,j+1]
-                    y_t[n,0] = data_input[i,j]
-                    n = n+1
-            
-            if m == n_snapshots_train:
-                x_test = x_t
-                y_test = y_t
-            else:
-                x_test = np.vstack((x_test,x_t))
-                y_test = np.vstack((y_test,y_t))
+        m = (self.n_snapshots)*self.freq
+#        file_input = "spectral/"+folder+"/00_wc/wc_"+str(m)+".csv"
+#        uc = np.genfromtxt(file_input, delimiter=',')
+#        file_input = "spectral/"+folder+"/00_sc/sc_"+str(m)+".csv"
+#        vc = np.genfromtxt(file_input, delimiter=',')
+#        file_input = "spectral/"+folder+"/00_sgs/sgs_"+str(m)+".csv"
+#        sgs = np.genfromtxt(file_input, delimiter=',')
+        file_input = "spectral/"+folder+"/uc/uc_"+str(m)+".csv"
+        uc = np.genfromtxt(file_input, delimiter=',')
+        file_input = "spectral/"+folder+"/vc/vc_"+str(m)+".csv"
+        vc = np.genfromtxt(file_input, delimiter=',')
+        file_input = "spectral/"+folder+"/Sc/Sc_"+str(m)+".csv"
+        S = np.genfromtxt(file_input, delimiter=',')
+        file_input = "spectral/"+folder+"/nu_true/nut_"+str(m)+".csv"
+        nu = np.genfromtxt(file_input, delimiter=',')
+        nu = nu.reshape((3,self.nx+1,self.ny+1))
+        nu11 = nu[0,:,:]
+        nu12 = nu[1,:,:]
+        nu22 = nu[2,:,:]
+        file_input = "spectral/"+folder+"/true_shear_stress/t_"+str(m)+".csv"
+        t = np.genfromtxt(file_input, delimiter=',')
+        t = t.reshape((3,self.nx+1,self.ny+1))
+        t11 = t[0,:,:]
+        t12 = t[1,:,:]
+        t22 = t[2,:,:]
+        
+        nx,ny = uc.shape
+        nt = int((nx-2)*(ny-2))
+        
+        x_t = np.zeros((nt,19))
+        y_t = np.zeros((nt,3))
+        
+        n = 0
+        for i in range(1,nx-1):
+            for j in range(1,ny-1):
+                x_t[n,0],x_t[n,9] = uc[i,j], vc[i,j]
+                x_t[n,1],x_t[n,10] = uc[i,j-1], vc[i,j-1]
+                x_t[n,2],x_t[n,11] = uc[i,j+1], vc[i,j+1]
+                x_t[n,3],x_t[n,12] = uc[i-1,j], vc[i-1,j]
+                x_t[n,4],x_t[n,13] = uc[i+1,j], vc[i+1,j]
+                x_t[n,5],x_t[n,14] = uc[i-1,j-1], vc[i-1,j-1]
+                x_t[n,6],x_t[n,15] = uc[i-1,j+1], vc[i-1,j+1]
+                x_t[n,7],x_t[n,16] = uc[i+1,j-1], vc[i+1,j-1]
+                x_t[n,8],x_t[n,17] = uc[i+1,j+1], vc[i+1,j+1]
+                x_t[n,18] = S[i,j]
+                
+                y_t[n,0] = t11[i,j]
+                y_t[n,1] = t12[i,j]
+                y_t[n,2] = t22[i,j]
+                n = n+1
+        
+        x_test = x_t
+        y_test = y_t
         
         return x_train, y_train, x_test, y_test
     
 #%%
 #A Convolutional Neural Network class
 class DNN:
-    def __init__(self,x_train,y_train,nf,nl):
+    def __init__(self,x_train,y_train,x_valid,y_valid,nf,nl):
         
         '''
         initialize the CNN class
@@ -127,6 +183,8 @@ class DNN:
         
         self.x_train = x_train
         self.y_train = y_train
+        self.x_valid = x_valid
+        self.y_valid = y_valid
         self.nf = nf
         self.nl = nl
         self.model = self.DNN(x_train,y_train,nf,nl)
@@ -153,11 +211,13 @@ class DNN:
         model: DNN model with defined activation function, number of layers
         '''
         
+        # L2 regularization: kernel_regularizer=l2(0.001)
         model = Sequential()
+        #model.add(Dropout(0.2))
         input_layer = Input(shape=(self.nf,))
         
-        x = Dense(120, activation='relu',  use_bias=True)(input_layer)
-        x = Dense(120, activation='relu',  use_bias=True)(x)
+        x = Dense(50, activation='relu',  use_bias=True)(input_layer)
+        x = Dense(50, activation='relu',  use_bias=True)(x)
         
         output_layer = Dense(nl, activation='linear', use_bias=True)(x)
         
@@ -165,7 +225,7 @@ class DNN:
         
         return model
 
-    def DNN_compile(self,optimizer):
+    def DNN_compile(self):
         
         '''
         compile the CNN model
@@ -176,7 +236,8 @@ class DNN:
 
         '''
         
-        self.model.compile(loss='mean_squared_error', optimizer=optimizer, metrics=[self.coeff_determination])
+        adam = optimizers.Adam(lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=None, decay=0.0, amsgrad=False)
+        self.model.compile(loss='mean_squared_error', optimizer=adam, metrics=['mse'])
         
     def DNN_train(self,epochs,batch_size):
         
@@ -198,7 +259,7 @@ class DNN:
         callbacks_list = [checkpoint]
         
         history_callback = self.model.fit(self.x_train,self.y_train,epochs=epochs,batch_size=batch_size, 
-                                          validation_split= 0.15,callbacks=callbacks_list)
+                                          validation_data= (self.x_valid,self.y_valid),callbacks=callbacks_list)
         return history_callback
     
     def DNN_history(self, history_callback):
@@ -243,7 +304,9 @@ class DNN:
         y_test: predicted output by the CNN (has same shape as label used for training)
         '''
         
-        y_test = self.model.predict(x_test)
+        custom_model = load_model('dnn_best_model.hd5')
+                                  #custom_objects={'coeff_determination':self.coeff_determination})
+        y_test = custom_model.predict(x_test)
         return y_test
     
     def DNN_info(self):
@@ -258,54 +321,52 @@ class DNN:
         
 #%%
 # generate training and testing data for CNN
-obj = DHIT(n_snapshots=50,nx=64,ny=64)
+obj = DHIT(nx=64,ny=64,freq=20,n_snapshots=20)
 
-x_train,y_train = obj.x_train,obj.y_train
+data,labels= obj.x_train,obj.y_train
 x_test,y_test = obj.x_test,obj.y_test
+
+x_train, x_valid, y_train, y_valid = train_test_split(data, labels, test_size=0.2, shuffle= True)
 
 ns_train,nf = x_train.shape
 ns_train,nl = y_train.shape 
 
-indices = np.random.randint(0,x_train.shape[0],1000)
-x_train = x_train[indices]
-y_train = y_train[indices]
+#%%
+# scaling between (-1,1)
+#sc_input = MinMaxScaler(feature_range=(-1,1))
+#sc_input = sc_input.fit(x_train)
+#x_train_sc = sc_input.transform(x_train)
+#
+#sc_output = MinMaxScaler(feature_range=(-1,1))
+#sc_output = sc_input.fit(y_train)
+#y_train_sc = sc_output.transform(y_train)
+#
+#x_test_sc = sc_input.transform(x_test)
 
 #%%
 # train the CNN model and predict for the test data
-model=DNN(x_train,y_train,nf,nl)
+model=DNN(x_train,y_train,x_valid,y_valid,nf,nl)
 model.DNN_info()
-model.DNN_compile(optimizer='adam')
+model.DNN_compile()
 
 #%%
-history_callback = model.DNN_train(epochs=300,batch_size=32)#,model_name="dnn_best_model.hd5")
-
-#%%
+history_callback = model.DNN_train(epochs=1000,batch_size=32)#,model_name="dnn_best_model.hd5")
 loss, val_loss = model.DNN_history(history_callback)
 
+#%%
 y_pred = model.DNN_predict(x_test)
+#y_pred_sc = model.DNN_predict(x_test_sc)
+#y_pred = sc_output.inverse_transform(y_pred_sc)
 
+#%%
+y_p = y_pred[:,0]
+y_t = y_test[:,0]
 
 #%%
 # histogram plot for shear stresses along with probability density function 
 # PDF formula: https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.norm.html
-nx = 64
-ny = 64
-
-y11t = y_test[49,:,:,0].flatten()
-mut = np.mean(y11t)
-sigmat = np.std(y11t)
-
-y11p = y_pred[49,:,:,0].flatten()
-mup = np.mean(y11p)
-sigmap = np.std(y11p)
-
-ts = np.genfromtxt('spectral/Re_8000/smag_shear_stress/ts_50.csv', delimiter=',') 
-ts = ts.reshape((3,nx+1,ny+1))
-y11s = ts[0,:,:].flatten()
-#y11s = ts[1,:,:].flatten()
-#y11s = ts[2,:,:].flatten()
-mus = np.mean(y11s)
-sigmas = np.std(y11s)
+mus = np.mean(y_t)
+sigmas = np.std(y_t)
 
 num_bins = 64
 
@@ -313,64 +374,32 @@ fig, axs = plt.subplots(1,2,figsize=(10,4.5))
 axs[0].set_yscale('log')
 
 # the histogram of the data
-ntrue, binst, patchest = axs[0].hist(y11t, num_bins, histtype='step', alpha=1, color='r',zorder=5,
-                                 linewidth=2.0,range=(-4*sigmat,4*sigmat),density=True,label="True")
+ntrue, binst, patchest = axs[0].hist(y_t, num_bins, histtype='step', alpha=1, color='r',zorder=5,
+                                 linewidth=2.0,range=(-4*np.std(y_t),4*np.std(y_t)),density=True,label="True")
 
-npred, binsp, patchesp = axs[0].hist(y11p, num_bins, histtype='step', alpha=1,color='b',zorder=10,
-                                 linewidth=2.0,range=(-4*sigmat,4*sigmat),density=True,label="CNN")
+npred, binsp, patchesp = axs[0].hist(y_p, num_bins, histtype='step', alpha=1,color='b',zorder=10,
+                                 linewidth=2.0,range=(-4*np.std(y_t),4*np.std(y_t)),density=True,label="DNN")
 
-nsmag, binss, patchess = axs[0].hist(y11s, num_bins, histtype='step', alpha=1,color='g',zorder=10,
-                                 linewidth=2.0,range=(-4*sigmat,4*sigmat),density=True,label="Smag")
+ntrue, binst, patchest = axs[1].hist(y_t, num_bins, histtype='step', alpha=1, color='r',zorder=5,
+                                 linewidth=2.0,range=(-4*np.std(y_t),4*np.std(y_t)),density=True,label="True")
 
-x_ticks = np.arange(-4*sigmat, 4.1*sigmat, sigmat)                                  
+npred, binsp, patchesp = axs[1].hist(y_p, num_bins, histtype='step', alpha=1,color='b',zorder=10,
+                                 linewidth=2.0,range=(-4*np.std(y_t),4*np.std(y_t)),density=True,label="DNN")
+
+x_ticks = np.arange(-4*np.std(y_t), 4.1*np.std(y_t), np.std(y_t))                                  
 x_labels = [r"${} \sigma$".format(i) for i in range(-4,5)]
 
-
-axs[0].set_title(r"$\tau_{22}$")
+axs[0].set_title(r"$\nu$")
 axs[0].set_xticks(x_ticks)                                                           
 axs[0].set_xticklabels(x_labels)              
-
-# Tweak spacing to prevent clipping of ylabel
 axs[0].legend()
 
-x_plott = np.linspace(min(y11t), max(y11t), 1000)
-x_plotp = np.linspace(min(y11p), max(y11p), 1000)
-x_plots = np.linspace(min(y11s), max(y11s), 1000)
-
-axs[1].plot(x_plott, norm.pdf(x_plott, mut, sigmat), 'r-', lw=3, label="True")
-axs[1].plot(x_plotp, norm.pdf(x_plotp, mup, sigmap), 'b-', lw=3, label="CNN")
-axs[1].plot(x_plots, norm.pdf(x_plots, mus, sigmas), 'g-', lw=3, label="Smag")       
-                                                    
-axs[1].legend(loc='best')
-
-axs[1].set_xlim(-4*sigmat,4*sigmat)  
-axs[1].set_title(r"$\tau_{22}$")                     
+axs[1].set_title(r"$\nu$")
 axs[1].set_xticks(x_ticks)                                                           
 axs[1].set_xticklabels(x_labels)              
+axs[1].legend()
 
 fig.tight_layout()
 plt.show()
 
-fig.savefig("extrapolation_t11.pdf", bbox_inches = 'tight')
-
-#%%
-# contour plot of shear stresses
-fig, axs = plt.subplots(1,3,sharey=True,figsize=(10.5,3.5))
-
-cs = axs[0].contourf(y_test[4,:,:,0].T, 120, cmap = 'jet', interpolation='bilinear')
-axs[0].text(0.4, -0.1, 'True', transform=axs[0].transAxes, fontsize=14, va='top')
-
-cs = axs[1].contourf(y_test[4,:,:,0].T, 120, cmap = 'jet', interpolation='bilinear')
-axs[1].text(0.4, -0.1, 'CNN', transform=axs[1].transAxes, fontsize=14, va='top')
-
-cs = axs[2].contourf(ts[0,:,:].T, 120, cmap = 'jet', interpolation='bilinear')
-axs[2].text(0.4, -0.1, 'Smag', transform=axs[2].transAxes, fontsize=14, va='top')
-
-fig.tight_layout() 
-
-fig.subplots_adjust(bottom=0.15)
-
-cbar_ax = fig.add_axes([0.22, -0.05, 0.6, 0.04])
-fig.colorbar(cs, cax=cbar_ax, orientation='horizontal')
-plt.show()
-
+fig.savefig("nu.pdf", bbox_inches = 'tight')

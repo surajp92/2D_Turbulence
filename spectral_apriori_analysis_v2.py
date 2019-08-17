@@ -35,7 +35,7 @@ font = {'family' : 'Times New Roman',
 plt.rc('font', **font)
 
 #%%
-def coarsen(nx,ny,nxc,nyc,u,uc):
+def coarsen(nx,ny,nxc,nyc,u):
     
     '''
     coarsen the solution field along with the size of the data 
@@ -55,22 +55,22 @@ def coarsen(nx,ny,nxc,nyc,u,uc):
     
     ufc = np.zeros((nxc,nyc),dtype='complex')
     
-    ufc [0:int(nxc/2),0:int(nyc/2)] = uf[0:int(nxc/2),0:int(nyc/2)]
-        
-    ufc [int(nxc/2):,0:int(nyc/2)] = uf[int(nx-nxc/2):,0:int(nyc/2)]
-    
-    ufc [0:int(nxc/2),int(nyc/2):] = uf[0:int(nxc/2),int(ny-nyc/2):]
-    
+    ufc [0:int(nxc/2),0:int(nyc/2)] = uf[0:int(nxc/2),0:int(nyc/2)]     
+    ufc [int(nxc/2):,0:int(nyc/2)] = uf[int(nx-nxc/2):,0:int(nyc/2)] 
+    ufc [0:int(nxc/2),int(nyc/2):] = uf[0:int(nxc/2),int(ny-nyc/2):] 
     ufc [int(nxc/2):,int(nyc/2):] =  uf[int(nx-nxc/2):,int(ny-nyc/2):] 
     
-    ufc  = ufc *(nxc*nyc)/(nx*ny)
+    ufc = ufc*(nxc*nyc)/(nx*ny)
     
-    utc = np.real(np.fft.ifft2(ufc ))
+    utc = np.real(np.fft.ifft2(ufc))
     
+    uc = np.zeros((nxc+1,nyc+1))
     uc[0:nxc,0:nyc] = utc
     uc[:,nyc] = uc[:,0]
     uc[nxc,:] = uc[0,:]
     uc[nxc,nyc] = uc[0,0]
+    
+    return uc
 
 #%%
 def les_filter(nx,ny,nxc,nyc,u,uc):
@@ -92,9 +92,7 @@ def les_filter(nx,ny,nxc,nyc,u,uc):
     uf = np.fft.fft2(u[0:nx,0:ny])
         
     uf[int(nxc/2):int(nx-nxc/2),:] = 0.0
-        
-    uf[:,int(nyc/2):int(ny-nyc/2)] = 0.0
- 
+    uf[:,int(nyc/2):int(ny-nyc/2)] = 0.0 
     utc = np.real(np.fft.ifft2(uf))
     
     uc[0:nx,0:ny] = utc
@@ -284,9 +282,9 @@ def grad_spectral(nx,ny,u):
             
 
 #%%
-def write_data(uc,vc,uuc,uvc,vvc,ucx,ucy,vcx,vcy,S,t,t_s,C,nu):
+def write_data(uc,vc,uuc,uvc,vvc,ucx,ucy,vcx,vcy,S,t,t_s,C,nu_s,nu_t):
     
-    folder = "data_"+ str(nx) #+ "_v2" 
+    folder = "data_"+ str(nx) + "_" + str(nxc) 
     if not os.path.exists("spectral/"+folder+"/uc"):
         os.makedirs("spectral/"+folder+"/uc")
         os.makedirs("spectral/"+folder+"/vc")
@@ -296,7 +294,8 @@ def write_data(uc,vc,uuc,uvc,vvc,ucx,ucy,vcx,vcy,S,t,t_s,C,nu):
         os.makedirs("spectral/"+folder+"/true_shear_stress")
         os.makedirs("spectral/"+folder+"/smag_shear_stress")
         os.makedirs("spectral/"+folder+"/coefficient")
-        os.makedirs("spectral/"+folder+"/nu")
+        os.makedirs("spectral/"+folder+"/nu_smag")
+        os.makedirs("spectral/"+folder+"/nu_true")
         os.makedirs("spectral/"+folder+"/ucx")
         os.makedirs("spectral/"+folder+"/ucy")
         os.makedirs("spectral/"+folder+"/vcx")
@@ -322,8 +321,8 @@ def write_data(uc,vc,uuc,uvc,vvc,ucx,ucy,vcx,vcy,S,t,t_s,C,nu):
     np.savetxt(filename, vvc, delimiter=",")
     filename = "spectral/"+folder+"/coefficient/c_"+str(int(n))+".csv"
     np.savetxt(filename, C, delimiter=",")
-    filename = "spectral/"+folder+"/nu/nu_"+str(int(n))+".csv"
-    np.savetxt(filename, nu, delimiter=",")
+    filename = "spectral/"+folder+"/nu_smag/nus_"+str(int(n))+".csv"
+    np.savetxt(filename, nu_s, delimiter=",")
     filename = "spectral/"+folder+"/ucx/ucx_"+str(int(n))+".csv"
     np.savetxt(filename, ucx, delimiter=",")
     filename = "spectral/"+folder+"/ucy/ucy_"+str(int(n))+".csv"
@@ -333,7 +332,7 @@ def write_data(uc,vc,uuc,uvc,vvc,ucx,ucy,vcx,vcy,S,t,t_s,C,nu):
     filename = "spectral/"+folder+"/vcy/vcy_"+str(int(n))+".csv"
     np.savetxt(filename, vcy, delimiter=",")
     filename = "spectral/"+folder+"/Sc/Sc_"+str(int(n))+".csv"
-    np.save(filename, S)
+    np.savetxt(filename, S, delimiter=",")
         
     with open("spectral/"+folder+"/true_shear_stress/t_"+str(int(n))+".csv", 'w') as outfile:
         outfile.write('# Array shape: {0}\n'.format(t.shape))
@@ -342,8 +341,14 @@ def write_data(uc,vc,uuc,uvc,vvc,ucx,ucy,vcx,vcy,S,t,t_s,C,nu):
             outfile.write('# New slice\n')
     
     with open("spectral/"+folder+"/smag_shear_stress/ts_"+str(int(n))+".csv", 'w') as outfile:
-        outfile.write('# Array shape: {0}\n'.format(t.shape))
+        outfile.write('# Array shape: {0}\n'.format(t_s.shape))
         for data_slice in t_s:
+            np.savetxt(outfile, data_slice, delimiter=",")
+            outfile.write('# New slice\n')
+    
+    with open("spectral/"+folder+"/nu_true/nut_"+str(int(n))+".csv", 'w') as outfile:
+        outfile.write('# Array shape: {0}\n'.format(nu_t.shape))
+        for data_slice in nu_t:
             np.savetxt(outfile, data_slice, delimiter=",")
             outfile.write('# New slice\n')
                           
@@ -507,11 +512,6 @@ def compute_cs_smag(dxc,dyc,nxc,nyc,uc,vc,dac,d11c,d12c,d22c,ics,ifltr,alpha):
     aa = (l11d*m11 + 2.0*(l12d*m12) + l22d*m22)
     bb = (m11*m11 + 2.0*(m12*m12) + m22*m22)
     
-    filename = "spectral/data_2048/lm/lm_"+str(int(n))+".csv"
-    np.savetxt(filename, aa, delimiter=",")
-    filename = "spectral/data_2048/lm/mm_"+str(int(n))+".csv"
-    np.savetxt(filename, bb, delimiter=",")
-    
     if ics == 1:
 #        CS2 = aa/bb  #Germano
 #        CS2 = CS2.clip(0.0)
@@ -557,9 +557,7 @@ def compute_stress_smag(nx,ny,nxc,nyc,dxc,dyc,u,v,n,ist,ics,ifltr,alpha):
     ------
     uc, vc, uuc, uvc, vvc, t, ts
     '''
-    
-    uc = np.empty((nxc+1,nyc+1))
-    vc = np.empty((nxc+1,nyc+1))
+
     t11 = np.empty((nxc+1,nyc+3))
     t12 = np.empty((nxc+1,nyc+1))
     t22 = np.empty((nxc+1,nyc+1))
@@ -568,23 +566,21 @@ def compute_stress_smag(nx,ny,nxc,nyc,dxc,dyc,u,v,n,ist,ics,ifltr,alpha):
     t22_s = np.empty((nxc+1,nyc+1))
     t = np.empty((3,nxc+1,nyc+1)) # true shear stress
     t_s = np.empty((3,nxc+1,nyc+1)) # Smagorinsky shear stress
+    nu_t = np.empty((3,nxc+1,nyc+1)) # true viscosity
     
     uu = np.empty((nx+1,ny+1))
     uv = np.empty((nx+1,ny+1))
     vv = np.empty((nx+1,ny+1))
-    uuc = np.empty((nxc+1,nyc+1))
-    uvc = np.empty((nxc+1,nyc+1))
-    vvc = np.empty((nxc+1,nyc+1))
     
     uu = u*u
     uv = u*v
     vv = v*v
     
-    coarsen(nx,ny,nxc,nyc,u,uc)
-    coarsen(nx,ny,nxc,nyc,v,vc)
-    coarsen(nx,ny,nxc,nyc,uu,uuc)
-    coarsen(nx,ny,nxc,nyc,uv,uvc)
-    coarsen(nx,ny,nxc,nyc,vv,vvc)
+    uc = coarsen(nx,ny,nxc,nyc,u)
+    vc = coarsen(nx,ny,nxc,nyc,v)
+    uuc = coarsen(nx,ny,nxc,nyc,uu)
+    uvc = coarsen(nx,ny,nxc,nyc,uv)
+    vvc = coarsen(nx,ny,nxc,nyc,vv)
     
     #True (deviatoric stress)
     t11 = uuc -uc*uc
@@ -607,13 +603,18 @@ def compute_stress_smag(nx,ny,nxc,nyc,dxc,dyc,u,v,n,ist,ics,ifltr,alpha):
     d11 = ucx
     d12 = 0.5*(ucy+vcx)
     d22 = vcy
+    
+    # true viscosity
+    nu_t[0,:,:] = t11d/d11
+    nu_t[1,:,:] = t12/d12
+    nu_t[2,:,:] = t22d/d22
 
     #da = np.sqrt(2.0*ux*ux + 2.0*vy*vy + (uy+vx)*(uy+vx)) # |S| 
     da = np.sqrt((ucx-vcy)**2 + (ucy+vcx)**2) # |S| 
     
     if ist == 1:
         CS2 = compute_cs_smag(dxc,dyc,nxc,nyc,uc,vc,da,d11,d12,d22,ics,ifltr,alpha) # for Smagorinsky
-        nu = CS2*delta**2*da
+        nu_s = CS2*delta**2*da
         print(n, " CS = ", np.max(CS2), " ", (np.min(CS2)),
               " ", np.mean((CS2)), " ", np.std((CS2)))
 
@@ -635,7 +636,7 @@ def compute_stress_smag(nx,ny,nxc,nyc,dxc,dyc,u,v,n,ist,ics,ifltr,alpha):
         t_s[1,:,:] = t12_b
         t_s[2,:,:] = t22_b - 0.5*(t11_b+t22_b)
         
-    write_data(uc,vc,uuc,uvc,vvc,ucx,ucy,vcx,vcy,da,t,t_s,CS2,nu)
+    write_data(uc,vc,uuc,uvc,vvc,ucx,ucy,vcx,vcy,da,t,t_s,CS2,nu_s,nu_t)
     
 #%%
 def compute_cs_leith(dxc,dyc,nxc,nyc,uc,vc,Wc,d11c,d12c,d22c,ics,ifltr,alpha):
@@ -754,8 +755,6 @@ def compute_stress_leith(nx,ny,nxc,nyc,dxc,dyc,u,v,n,ist,ics,ifltr,alpha):
     uc, vc, uuc, uvc, vvc, t, ts
     '''
     
-    uc = np.empty((nxc+1,nyc+1))
-    vc = np.empty((nxc+1,nyc+1))
     t11 = np.empty((nxc+1,nyc+3))
     t12 = np.empty((nxc+1,nyc+1))
     t22 = np.empty((nxc+1,nyc+1))
@@ -768,9 +767,6 @@ def compute_stress_leith(nx,ny,nxc,nyc,dxc,dyc,u,v,n,ist,ics,ifltr,alpha):
     uu = np.empty((nx+1,ny+1))
     uv = np.empty((nx+1,ny+1))
     vv = np.empty((nx+1,ny+1))
-    uuc = np.empty((nxc+1,nyc+1))
-    uvc = np.empty((nxc+1,nyc+1))
-    vvc = np.empty((nxc+1,nyc+1))
     
     ux = np.empty((nxc+1,nyc+1))
     uy = np.empty((nxc+1,nyc+1))
@@ -783,11 +779,11 @@ def compute_stress_leith(nx,ny,nxc,nyc,dxc,dyc,u,v,n,ist,ics,ifltr,alpha):
     uv = u*v
     vv = v*v
     
-    coarsen(nx,ny,nxc,nyc,u,uc)
-    coarsen(nx,ny,nxc,nyc,v,vc)
-    coarsen(nx,ny,nxc,nyc,uu,uuc)
-    coarsen(nx,ny,nxc,nyc,uv,uvc)
-    coarsen(nx,ny,nxc,nyc,vv,vvc)
+    uc = coarsen(nx,ny,nxc,nyc,u)
+    vc = coarsen(nx,ny,nxc,nyc,v)
+    uuc = coarsen(nx,ny,nxc,nyc,uu)
+    uvc = coarsen(nx,ny,nxc,nyc,uv)
+    vvc = coarsen(nx,ny,nxc,nyc,vv)
     
     #True (deviatoric stress)
     t11 = uuc -uc*uc
@@ -948,8 +944,6 @@ def compute_stress_horiuti(nx,ny,nxc,nyc,dxc,dyc,u,v,n,ist,ics,ifltr,ihr,alpha):
     uc, vc, uuc, uvc, vvc, t, ts
     '''
     
-    uc = np.empty((nxc+1,nyc+1))
-    vc = np.empty((nxc+1,nyc+1))
     t11 = np.empty((nxc+1,nyc+3))
     t12 = np.empty((nxc+1,nyc+1))
     t22 = np.empty((nxc+1,nyc+1))
@@ -962,9 +956,6 @@ def compute_stress_horiuti(nx,ny,nxc,nyc,dxc,dyc,u,v,n,ist,ics,ifltr,ihr,alpha):
     uu = np.empty((nx+1,ny+1))
     uv = np.empty((nx+1,ny+1))
     vv = np.empty((nx+1,ny+1))
-    uuc = np.empty((nxc+1,nyc+1))
-    uvc = np.empty((nxc+1,nyc+1))
-    vvc = np.empty((nxc+1,nyc+1))
     
     ux = np.empty((nxc+1,nyc+1))
     uy = np.empty((nxc+1,nyc+1))
@@ -975,11 +966,11 @@ def compute_stress_horiuti(nx,ny,nxc,nyc,dxc,dyc,u,v,n,ist,ics,ifltr,ihr,alpha):
     uv = u*v
     vv = v*v
     
-    coarsen(nx,ny,nxc,nyc,u,uc)
-    coarsen(nx,ny,nxc,nyc,v,vc)
-    coarsen(nx,ny,nxc,nyc,uu,uuc)
-    coarsen(nx,ny,nxc,nyc,uv,uvc)
-    coarsen(nx,ny,nxc,nyc,vv,vvc)
+    uc = coarsen(nx,ny,nxc,nyc,u)
+    vc = coarsen(nx,ny,nxc,nyc,v)
+    uuc = coarsen(nx,ny,nxc,nyc,uu)
+    uvc = coarsen(nx,ny,nxc,nyc,uv)
+    vvc = coarsen(nx,ny,nxc,nyc,vv)
     
     #True (deviatoric stress)
     t11 = uuc -uc*uc
@@ -1329,12 +1320,28 @@ dy = ly/np.float64(ny)
 
 dxc = lx/np.float64(nxc)
 dyc = ly/np.float64(nyc)
-folder = 'data_'+str(nx)#+"_v2"
-
+    
 #%%
-for n in range(1,ns):
+for n in range(226,ns+1):
+    folder = "data_"+str(nx)
     file_input = "spectral/"+folder+"/05_streamfunction/s_"+str(n)+".csv"
     s = np.genfromtxt(file_input, delimiter=',')
+    file_input = "spectral/"+folder+"/04_vorticity/w_"+str(n)+".csv"
+    w = np.genfromtxt(file_input, delimiter=',') 
+    
+    wc = coarsen(nx,ny,nxc,nyc,w)
+    sc = coarsen(nx,ny,nxc,nyc,s)
+    
+    folder = "data_" + str(nx) + "_" + str(nxc)
+    if not os.path.exists("spectral/"+folder+"/00_wc"):
+        os.makedirs("spectral/"+folder+"/00_wc")
+        os.makedirs("spectral/"+folder+"/00_sc")
+    
+    filename = "spectral/"+folder+"/00_wc/wc_"+str(int(n))+".csv"
+    np.savetxt(filename, wc, delimiter=",")
+    filename = "spectral/"+folder+"/00_sc/sc_"+str(int(n))+".csv"
+    np.savetxt(filename, sc, delimiter=",")
+    
     #u,v = compute_velocity(nx,ny,dx,dy,s)
     sx,sy = grad_spectral(nx,ny,s)
     u = sy
@@ -1343,23 +1350,17 @@ for n in range(1,ns):
 
 
 #%%
-tt = np.genfromtxt("spectral/"+folder+"/true_shear_stress/t_"+str(390)+"s.csv", delimiter=',') 
+tt = np.genfromtxt("spectral/"+folder+"/true_shear_stress/t_"+str(ns)+".csv", delimiter=',') 
 tt = tt.reshape((3,nxc+1,nyc+1))
 t11t = tt[0,:,:]
 t12t = tt[1,:,:]
 t22t = tt[2,:,:]
 
-ts = np.genfromtxt("spectral/"+folder+"/smag_shear_stress/ts_"+str(390)+"s.csv", delimiter=',') 
+ts = np.genfromtxt("spectral/"+folder+"/smag_shear_stress/ts_"+str(ns)+".csv", delimiter=',') 
 ts = ts.reshape((3,nxc+1,nyc+1))
 t11sm_s = ts[0,:,:]
 t12sm_s = ts[1,:,:]
 t22sm_s = ts[2,:,:]
-
-td = np.genfromtxt("spectral/"+folder+"/smag_shear_stress/ts_"+str(390)+"v2.csv", delimiter=',') 
-td = td.reshape((3,nxc+1,nyc+1))
-t11sm_d = td[0,:,:]
-t12sm_d = td[1,:,:]
-t22sm_d = td[2,:,:]
 
 num_bins = 64
 
@@ -1375,9 +1376,7 @@ ntrue, binst, patchest = axs[0].hist(t11t.flatten(), num_bins, histtype='step', 
 ntrue, binst, patchest = axs[0].hist(t11sm_s.flatten(), num_bins, histtype='step', alpha=1, color='b',zorder=5,
                                  linewidth=2.0,range=(-4*np.std(t11t),4*np.std(t11t)),density=True,
                                  label="Static")
-ntrue, binst, patchest = axs[0].hist(t11sm_d.flatten(), num_bins, histtype='step', alpha=1, color='g',zorder=5,
-                                 linewidth=2.0,range=(-4*np.std(t11t),4*np.std(t11t)),density=True,
-                                 label="Dynamic")
+
 
 ntrue, binst, patchest = axs[1].hist(t12t.flatten(), num_bins, histtype='step', alpha=1, color='r',zorder=5,
                                  linewidth=2.0,range=(-4*np.std(t12t),4*np.std(t12t)),density=True,
@@ -1385,10 +1384,6 @@ ntrue, binst, patchest = axs[1].hist(t12t.flatten(), num_bins, histtype='step', 
 ntrue, binst, patchest = axs[1].hist(t12sm_s.flatten(), num_bins, histtype='step', alpha=1, color='b',zorder=5,
                                  linewidth=2.0,range=(-4*np.std(t12t),4*np.std(t12t)),density=True,
                                  label="Static")
-ntrue, binst, patchest = axs[1].hist(t12sm_d.flatten(), num_bins, histtype='step', alpha=1, color='g',zorder=5,
-                                 linewidth=2.0,range=(-4*np.std(t12t),4*np.std(t12t)),density=True,
-                                 label="Dynamic")
-
 
 ntrue, binst, patchest = axs[2].hist(t22t.flatten(), num_bins, histtype='step', alpha=1, color='r',zorder=5,
                                  linewidth=2.0,range=(-4*np.std(t22t),4*np.std(t22t)),density=True,
@@ -1396,9 +1391,6 @@ ntrue, binst, patchest = axs[2].hist(t22t.flatten(), num_bins, histtype='step', 
 ntrue, binst, patchest = axs[2].hist(t22sm_s.flatten(), num_bins, histtype='step', alpha=1, color='b',zorder=5,
                                  linewidth=2.0,range=(-4*np.std(t22t),4*np.std(t22t)),density=True,
                                  label="Static")
-ntrue, binst, patchest = axs[2].hist(t22sm_d.flatten(), num_bins, histtype='step', alpha=1, color='g',zorder=5,
-                                 linewidth=2.0,range=(-4*np.std(t22t),4*np.std(t22t)),density=True,
-                                 label="Dynamic")
 
 x_ticks = np.arange(-4*np.std(t11t), 4.1*np.std(t11t), np.std(t11t))                                  
 x_labels = [r"${} \sigma$".format(i) for i in range(-4,5)]
@@ -1416,17 +1408,6 @@ axs[1].legend()
 axs[2].legend()   
 
 fig.tight_layout()
-plt.show()
-
-
-#%%
-
-aa = np.genfromtxt("spectral/data_2048/lm/lm_"+str(390)+".csv", delimiter=',') 
-bb = np.genfromtxt("spectral/data_2048/lm/mm_"+str(390)+".csv", delimiter=',')
-aa = aa.flatten()
-bb = bb.flatten()
-
-plt.scatter(bb, aa)
 plt.show()
 
 

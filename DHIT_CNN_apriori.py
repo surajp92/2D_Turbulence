@@ -11,6 +11,10 @@ from keras.models import Sequential, Model
 from keras.layers import Input, Conv2D
 from scipy.interpolate import UnivariateSpline
 from scipy.stats import norm 
+from numpy.random import seed
+seed(1)
+from tensorflow import set_random_seed
+set_random_seed(2)
 
 #%%
 #Class of problem to solve 2D decaying homogeneous isotrpic turbulence
