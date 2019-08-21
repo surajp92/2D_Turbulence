@@ -73,7 +73,7 @@ def coarsen(nx,ny,nxc,nyc,u):
     return uc
 
 #%%
-def les_filter(nx,ny,nxc,nyc,u,uc):
+def les_filter(nx,ny,nxc,nyc,u):
     
     '''
     coarsen the solution field keeping the size of the data same
@@ -95,14 +95,17 @@ def les_filter(nx,ny,nxc,nyc,u,uc):
     uf[:,int(nyc/2):int(ny-nyc/2)] = 0.0 
     utc = np.real(np.fft.ifft2(uf))
     
+    uc = np.zeros((nx+1,ny+1))
     uc[0:nx,0:ny] = utc
     # periodic bc
     uc[:,ny] = uc[:,0]
     uc[nx,:] = uc[0,:]
     uc[nx,ny] = uc[0,0]
+    
+    return uc
 
 #%%
-def trapezoidal_filter(nx,ny,u,uc):
+def trapezoidal_filter(nx,ny,u):
     
     '''
     coarsen the solution field keeping the size of the data same
@@ -125,6 +128,7 @@ def trapezoidal_filter(nx,ny,u,uc):
     un[0,:] = un[nx,:]
     un[nx+2,:] = un[2,:]
     
+    uc = np.zeros((nxc+1,nyc+1))
     uc[:,:] = ( 4.0*un[1:nx+2,1:ny+2] \
                           + 2.0*un[2:nx+3,1:ny+2] \
                           + 2.0*un[0:nx+1,1:ny+2] \
@@ -134,8 +138,8 @@ def trapezoidal_filter(nx,ny,u,uc):
                           + un[0:nx+1,0:ny+1] \
                           + un[0:nx+1,2:ny+3] \
                           + un[2:nx+3,2:ny+3])/16.0
-
-    
+      
+    return uc
 
 #%%
 def gaussian_filter(nx,ny,nxc,nyc,u,uc):
@@ -174,11 +178,14 @@ def gaussian_filter(nx,ny,nxc,nyc,u,uc):
     
     utc = np.fft.ifft2(uf)
     
+    uc = np.zeros((nxc+1,nyc+1))
     uc[0:nx,0:ny] = np.real(utc)
     # periodic bc
     uc[:,ny] = uc[:,0]
     uc[nx,:] = uc[0,:]
     uc[nx,ny] = uc[0,0]
+    
+    return uc
     
 #%%
 def elliptic_filter(nx,ny,nxc,nyc,u,uc):
@@ -217,22 +224,27 @@ def elliptic_filter(nx,ny,nxc,nyc,u,uc):
     
     utc = np.fft.ifft2(uf)
     
+    uc = np.zeros((nxc+1,nyc+1))
     uc[0:nx,0:ny] = np.real(utc)
     # periodic bc
     uc[:,ny] = uc[:,0]
     uc[nx,:] = uc[0,:]
     uc[nx,ny] = uc[0,0]
     
+    return uc
+    
 #%%
-def all_filter(nx,ny,nxc,nyc,u,uc,ifltr):
+def all_filter(nx,ny,nxc,nyc,u,ifltr):
     if ifltr == 1:
-        les_filter(nx,ny,nxc,nyc,u,uc)
+        uc = les_filter(nx,ny,nxc,nyc,u)
     elif ifltr == 2:
-        trapezoidal_filter(nx,ny,u,uc)
+        uc = trapezoidal_filter(nx,ny,u)
     elif ifltr == 3:
-        gaussian_filter(nx,ny,nxc,nyc,u,uc)
+        uc = gaussian_filter(nx,ny,nxc,nyc,u)
     elif ifltr == 4:
-        elliptic_filter(nx,ny,nxc,nyc,u,uc)
+        uc = elliptic_filter(nx,ny,nxc,nyc,u)
+    
+    return uc
     
 #%%
 def grad_spectral(nx,ny,u):
@@ -284,7 +296,7 @@ def grad_spectral(nx,ny,u):
 #%%
 def write_data(uc,vc,uuc,uvc,vvc,ucx,ucy,vcx,vcy,S,t,t_s,C,nu_s,nu_t):
     
-    folder = "data_"+ str(nx) + "_" + str(nxc) 
+    folder = "data_"+ str(nx) + "_" + str(nxc) + "_V2"
     if not os.path.exists("spectral/"+folder+"/uc"):
         os.makedirs("spectral/"+folder+"/uc")
         os.makedirs("spectral/"+folder+"/vc")
@@ -453,30 +465,22 @@ def compute_cs_smag(dxc,dyc,nxc,nyc,uc,vc,dac,d11c,d12c,d22c,ics,ifltr,alpha):
     
     nxcc = int(nxc/alpha)
     nycc = int(nyc/alpha)
-    ucc = np.empty((nxc+1,nyc+1))
-    vcc = np.empty((nxc+1,nyc+1))
-    uucc = np.empty((nxc+1,nyc+1))
-    uvcc = np.empty((nxc+1,nyc+1))
-    vvcc = np.empty((nxc+1,nyc+1))
     
     dacc = np.empty((nxc+1,nyc+1))
     d11cc = np.empty((nxc+1,nyc+1))
     d12cc = np.empty((nxc+1,nyc+1))
     d22cc = np.empty((nxc+1,nyc+1))
-    h11cc = np.empty((nxc+1,nyc+1))
-    h12cc = np.empty((nxc+1,nyc+1))
-    h22cc = np.empty((nxc+1,nyc+1))
 
     uuc = uc*uc
     uvc = uc*vc
     vvc = vc*vc
     
-    all_filter(nxc,nyc,nxcc,nycc,uuc,uucc,ifltr)
-    all_filter(nxc,nyc,nxcc,nycc,uvc,uvcc,ifltr)
-    all_filter(nxc,nyc,nxcc,nycc,vvc,vvcc,ifltr)
+    uucc = all_filter(nxc,nyc,nxcc,nycc,uuc,ifltr)
+    uvcc = all_filter(nxc,nyc,nxcc,nycc,uvc,ifltr)
+    vvcc = all_filter(nxc,nyc,nxcc,nycc,vvc,ifltr)
       
-    all_filter(nxc,nyc,nxcc,nycc,uc,ucc,ifltr)
-    all_filter(nxc,nyc,nxcc,nycc,vc,vcc,ifltr)
+    ucc = all_filter(nxc,nyc,nxcc,nycc,uc,ifltr)
+    vcc = all_filter(nxc,nyc,nxcc,nycc,vc,ifltr)
         
     uccx,uccy = grad_spectral(nxc,nyc,ucc)
     vccx,vccy = grad_spectral(nxc,nyc,vcc)
@@ -491,36 +495,36 @@ def compute_cs_smag(dxc,dyc,nxc,nyc,uc,vc,dac,d11c,d12c,d22c,ics,ifltr,alpha):
     h12c = dac*d12c
     h22c = dac*d22c
     
-    all_filter(nxc,nyc,nxcc,nycc,h11c,h11cc,ifltr)
-    all_filter(nxc,nyc,nxcc,nycc,h12c,h12cc,ifltr)
-    all_filter(nxc,nyc,nxcc,nycc,h22c,h22cc,ifltr)
+    h11cc = all_filter(nxc,nyc,nxcc,nycc,h11c,ifltr)
+    h12cc = all_filter(nxc,nyc,nxcc,nycc,h12c,ifltr)
+    h22cc = all_filter(nxc,nyc,nxcc,nycc,h22c,ifltr)
+    
+    delta = np.sqrt(dxc*dyc)
     
     l11 = uucc - ucc*ucc
     l12 = uvcc - ucc*vcc
     l22 = vvcc - vcc*vcc
     
-    l11d = l11 - 0.5*(l11 + l22)
+    l11d = l11 #- 0.5*(l11 + l22)
     l12d = l12
-    l22d = l22 - 0.5*(l11 + l22)
+    l22d = l22 #- 0.5*(l11 + l22)
     
-    delta = np.sqrt(dxc*dyc)
-    
-    m11 = 2.0*delta**2*(h11cc-alpha**2*dacc*d11cc)
-    m12 = 2.0*delta**2*(h12cc-alpha**2*dacc*d12cc)
-    m22 = 2.0*delta**2*(h22cc-alpha**2*dacc*d22cc)
+    m11 = delta**2*(h11cc-alpha**2*dacc*d11cc)
+    m12 = delta**2*(h12cc-alpha**2*dacc*d12cc)
+    m22 = delta**2*(h22cc-alpha**2*dacc*d22cc)
     
     aa = (l11d*m11 + 2.0*(l12d*m12) + l22d*m22)
     bb = (m11*m11 + 2.0*(m12*m12) + m22*m22)
     
     if ics == 1:
-#        CS2 = aa/bb  #Germano
+#        CS2 = (aa)/(2.0*bb)  #Germano
 #        CS2 = CS2.clip(0.0)
 #        x = np.linspace(0.0,2.0*np.pi,nxc+1)
 #        y = np.linspace(0.0,2.0*np.pi,nxc+1)
 #        ai = simps(simps(aa[0:nxc+2,0:nyc+2],y),x)
 #        bi = simps(simps(bb[0:nxc+2,0:nyc+2],y),x)
 #        CS2 = (ai/bi)*np.ones((nxc+1,nyc+1))
-        CS2 = (np.sum(np.abs(aa))/np.sum(np.abs(bb)))*np.ones((nxc+1,nyc+1))
+        CS2 = (np.sum(aa + abs(aa))/np.sum(bb))*np.ones((nxc+1,nyc+1))
         
     elif ics == 2:
         #CS2 = 0.04*np.ones((nxc+1,nyc+1)) # constant
@@ -1299,7 +1303,7 @@ if (ich != 19):
 
 #%%
 ist = 1         # 1: Smagoronsky, 2: Leith, 3: Horiuti, 4: Hybrid, 5: Bardina
-ics = 2         # 1: Germano (dynamic), 2: static
+ics = 1         # 1: Germano (dynamic), 2: static
 ifltr = 1       # 1: ideal (LES), 2: Trapezoidal, 3: Gaussian, 4: Elliptic
 ihr = 3         # 1: model-1, 2: model-2, 3: model-3
 
@@ -1322,7 +1326,7 @@ dxc = lx/np.float64(nxc)
 dyc = ly/np.float64(nyc)
     
 #%%
-for n in range(226,ns+1):
+for n in range(1,ns+1):
     folder = "data_"+str(nx)
     file_input = "spectral/"+folder+"/05_streamfunction/s_"+str(n)+".csv"
     s = np.genfromtxt(file_input, delimiter=',')
@@ -1332,7 +1336,7 @@ for n in range(226,ns+1):
     wc = coarsen(nx,ny,nxc,nyc,w)
     sc = coarsen(nx,ny,nxc,nyc,s)
     
-    folder = "data_" + str(nx) + "_" + str(nxc)
+    folder = "data_" + str(nx) + "_" + str(nxc) + "_V2"
     if not os.path.exists("spectral/"+folder+"/00_wc"):
         os.makedirs("spectral/"+folder+"/00_wc")
         os.makedirs("spectral/"+folder+"/00_sc")
@@ -1350,6 +1354,7 @@ for n in range(226,ns+1):
 
 
 #%%
+folder = "data_" + str(nx) + "_" + str(nxc) + "_V2"
 tt = np.genfromtxt("spectral/"+folder+"/true_shear_stress/t_"+str(ns)+".csv", delimiter=',') 
 tt = tt.reshape((3,nxc+1,nyc+1))
 t11t = tt[0,:,:]
@@ -1364,7 +1369,7 @@ t22sm_s = ts[2,:,:]
 
 num_bins = 64
 
-fig, axs = plt.subplots(1,3,figsize=(15,5))
+fig, axs = plt.subplots(1,3,figsize=(12,4))
 axs[0].set_yscale('log')
 axs[1].set_yscale('log')
 axs[2].set_yscale('log')
@@ -1374,7 +1379,7 @@ ntrue, binst, patchest = axs[0].hist(t11t.flatten(), num_bins, histtype='step', 
                                  linewidth=2.0,range=(-4*np.std(t11t),4*np.std(t11t)),density=True,
                                  label="True")
 ntrue, binst, patchest = axs[0].hist(t11sm_s.flatten(), num_bins, histtype='step', alpha=1, color='b',zorder=5,
-                                 linewidth=2.0,range=(-4*np.std(t11t),4*np.std(t11t)),density=True,
+                                 linewidth=2.0,range=(-4*np.std(t11sm_s),4*np.std(t11sm_s)),density=True,
                                  label="Static")
 
 

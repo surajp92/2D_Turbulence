@@ -25,7 +25,7 @@ from keras.regularizers import l2
 #%%
 #Class of problem to solve 2D decaying homogeneous isotrpic turbulence
 class DHIT:
-    def __init__(self,nx,ny,freq,n_snapshots):
+    def __init__(self,nx,ny,nxf,nyf,freq,n_snapshots):
         
         '''
         initialize the DHIT class
@@ -39,6 +39,8 @@ class DHIT:
         
         self.nx = nx
         self.ny = ny
+        self.nxf = nxf
+        self.nyf = nyf
         self.freq = freq
         self.n_snapshots = n_snapshots
         self.x_train,self.y_train,self.x_test,self.y_test = self.gen_data()
@@ -51,7 +53,7 @@ class DHIT:
         '''
         
         for m in range(1,self.n_snapshots):
-            folder = "data_"+ str(1024) #+ "_V2" 
+            folder = "data_"+ str(self.nxf) + "_" + str(self.nx) 
 #            file_input = "spectral/"+folder+"/00_wc/wc_"+str(m*self.freq)+".csv"
 #            uc = np.genfromtxt(file_input, delimiter=',')
 #            file_input = "spectral/"+folder+"/00_sc/sc_"+str(m*self.freq)+".csv"
@@ -321,28 +323,33 @@ class DNN:
         
 #%%
 # generate training and testing data for CNN
-obj = DHIT(nx=64,ny=64,freq=20,n_snapshots=20)
+freq = 5
+n_snapshots = 80
+nxf, nyf = 1024, 1024
+nx, ny = 64, 64
+
+obj = DHIT(nx=nx,ny=ny,nxf=nxf,nyf=nyf,freq=freq,n_snapshots=n_snapshots)
 
 data,labels= obj.x_train,obj.y_train
 x_test,y_test = obj.x_test,obj.y_test
 
-x_train, x_valid, y_train, y_valid = train_test_split(data, labels, test_size=0.2, shuffle= True)
+#%%
+# scaling between (-1,1)
+sc_input = MinMaxScaler(feature_range=(-1,1))
+sc_input = sc_input.fit(data)
+data_sc = sc_input.transform(data)
+
+sc_output = MinMaxScaler(feature_range=(-1,1))
+sc_output = sc_output.fit(labels)
+labels_sc = sc_output.transform(labels)
+
+x_test_sc = sc_input.transform(x_test)
+
+#%%
+x_train, x_valid, y_train, y_valid = train_test_split(data_sc, labels_sc, test_size=0.2, shuffle= True)
 
 ns_train,nf = x_train.shape
 ns_train,nl = y_train.shape 
-
-#%%
-# scaling between (-1,1)
-#sc_input = MinMaxScaler(feature_range=(-1,1))
-#sc_input = sc_input.fit(x_train)
-#x_train_sc = sc_input.transform(x_train)
-#
-#sc_output = MinMaxScaler(feature_range=(-1,1))
-#sc_output = sc_input.fit(y_train)
-#y_train_sc = sc_output.transform(y_train)
-#
-#x_test_sc = sc_input.transform(x_test)
-
 #%%
 # train the CNN model and predict for the test data
 model=DNN(x_train,y_train,x_valid,y_valid,nf,nl)
@@ -350,56 +357,86 @@ model.DNN_info()
 model.DNN_compile()
 
 #%%
-history_callback = model.DNN_train(epochs=1000,batch_size=32)#,model_name="dnn_best_model.hd5")
+history_callback = model.DNN_train(epochs=500,batch_size=64)#,model_name="dnn_best_model.hd5")
 loss, val_loss = model.DNN_history(history_callback)
 
 #%%
-y_pred = model.DNN_predict(x_test)
-#y_pred_sc = model.DNN_predict(x_test_sc)
-#y_pred = sc_output.inverse_transform(y_pred_sc)
+#y_pred = model.DNN_predict(x_test)
+y_pred_sc = model.DNN_predict(x_test_sc)
+y_pred = sc_output.inverse_transform(y_pred_sc)
 
 #%%
-y_p = y_pred[:,0]
-y_t = y_test[:,0]
+folder = "data_"+ str(nxf) + "_" + str(nx) 
+m = n_snapshots*freq
+file_input = "spectral/"+folder+"/smag_shear_stress/ts_"+str(m)+".csv"
+ts = np.genfromtxt(file_input, delimiter=',')
+ts = ts.reshape((3,nx+1,ny+1))
+t11s = ts[0,:,:]
+t12s = ts[1,:,:]
+t22s = ts[2,:,:]
 
 #%%
 # histogram plot for shear stresses along with probability density function 
 # PDF formula: https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.norm.html
-mus = np.mean(y_t)
-sigmas = np.std(y_t)
-
 num_bins = 64
 
-fig, axs = plt.subplots(1,2,figsize=(10,4.5))
+fig, axs = plt.subplots(1,3,figsize=(12,4))
 axs[0].set_yscale('log')
+axs[1].set_yscale('log')
+axs[2].set_yscale('log')
 
 # the histogram of the data
-ntrue, binst, patchest = axs[0].hist(y_t, num_bins, histtype='step', alpha=1, color='r',zorder=5,
-                                 linewidth=2.0,range=(-4*np.std(y_t),4*np.std(y_t)),density=True,label="True")
+axs[0].hist(y_test[:,0].flatten(), num_bins, histtype='step', alpha=1, color='r',zorder=5,
+                                 linewidth=2.0,range=(-4*np.std(y_test[:,0]),4*np.std(y_test[:,0])),density=True,label="True")
 
-npred, binsp, patchesp = axs[0].hist(y_p, num_bins, histtype='step', alpha=1,color='b',zorder=10,
-                                 linewidth=2.0,range=(-4*np.std(y_t),4*np.std(y_t)),density=True,label="DNN")
+axs[0].hist(y_pred[:,0].flatten(), num_bins, histtype='step', alpha=1,color='b',zorder=10,
+                                 linewidth=2.0,range=(-4*np.std(y_test[:,0]),4*np.std(y_test[:,0])),density=True,label="DNN")
 
-ntrue, binst, patchest = axs[1].hist(y_t, num_bins, histtype='step', alpha=1, color='r',zorder=5,
-                                 linewidth=2.0,range=(-4*np.std(y_t),4*np.std(y_t)),density=True,label="True")
+axs[0].hist(t11s.flatten(), num_bins, histtype='step', alpha=1,color='g',zorder=10,
+            linewidth=2.0,range=(-4*np.std(y_test[:,0]),4*np.std(y_test[:,0])),density=True,label=r"$C_s=0.18$")
 
-npred, binsp, patchesp = axs[1].hist(y_p, num_bins, histtype='step', alpha=1,color='b',zorder=10,
-                                 linewidth=2.0,range=(-4*np.std(y_t),4*np.std(y_t)),density=True,label="DNN")
-
-x_ticks = np.arange(-4*np.std(y_t), 4.1*np.std(y_t), np.std(y_t))                                  
+x_ticks = np.arange(-4*np.std(y_test[:,0]), 4.1*np.std(y_test[:,0]), np.std(y_test[:,0]))                                  
 x_labels = [r"${} \sigma$".format(i) for i in range(-4,5)]
-
-axs[0].set_title(r"$\nu$")
+axs[0].set_title(r"$\tau_{11}$")
 axs[0].set_xticks(x_ticks)                                                           
 axs[0].set_xticklabels(x_labels)              
 axs[0].legend()
 
-axs[1].set_title(r"$\nu$")
+#------#
+axs[1].hist(y_test[:,1].flatten(), num_bins, histtype='step', alpha=1, color='r',zorder=5,
+                                 linewidth=2.0,range=(-4*np.std(y_test[:,1]),4*np.std(y_test[:,1])),density=True,label="True")
+
+axs[1].hist(y_pred[:,1].flatten(), num_bins, histtype='step', alpha=1,color='b',zorder=10,
+                                 linewidth=2.0,range=(-4*np.std(y_test[:,1]),4*np.std(y_test[:,1])),density=True,label="DNN")
+
+axs[1].hist(t12s.flatten(), num_bins, histtype='step', alpha=1,color='g',zorder=10,
+            linewidth=2.0,range=(-4*np.std(y_test[:,1]),4*np.std(y_test[:,1])),density=True,label=r"$C_s=0.18$")
+
+x_ticks = np.arange(-4*np.std(y_test[:,1]), 4.1*np.std(y_test[:,1]), np.std(y_test[:,1]))                                  
+x_labels = [r"${} \sigma$".format(i) for i in range(-4,5)]
+axs[1].set_title(r"$\tau_{12}$")
 axs[1].set_xticks(x_ticks)                                                           
 axs[1].set_xticklabels(x_labels)              
 axs[1].legend()
 
+#------#
+axs[2].hist(y_test[:,2].flatten(), num_bins, histtype='step', alpha=1, color='r',zorder=5,
+                                 linewidth=2.0,range=(-4*np.std(y_test[:,2]),4*np.std(y_test[:,2])),density=True,label="True")
+
+axs[2].hist(y_pred[:,2].flatten(), num_bins, histtype='step', alpha=1,color='b',zorder=10,
+                                 linewidth=2.0,range=(-4*np.std(y_test[:,2]),4*np.std(y_test[:,2])),density=True,label="DNN")
+
+axs[2].hist(t22s.flatten(), num_bins, histtype='step', alpha=1,color='g',zorder=10,
+            linewidth=2.0,range=(-4*np.std(y_test[:,2]),4*np.std(y_test[:,2])),density=True,label=r"$C_s=0.18$")
+
+x_ticks = np.arange(-4*np.std(y_test[:,2]), 4.1*np.std(y_test[:,2]), np.std(y_test[:,2]))                                  
+x_labels = [r"${} \sigma$".format(i) for i in range(-4,5)]
+axs[2].set_title(r"$\tau_{22}$")
+axs[2].set_xticks(x_ticks)                                                           
+axs[2].set_xticklabels(x_labels)              
+axs[2].legend()
+
 fig.tight_layout()
 plt.show()
 
-fig.savefig("nu.pdf", bbox_inches = 'tight')
+fig.savefig("ts_dnn.pdf", bbox_inches = 'tight')

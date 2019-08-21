@@ -19,7 +19,7 @@ set_random_seed(2)
 #%%
 #Class of problem to solve 2D decaying homogeneous isotrpic turbulence
 class DHIT:
-    def __init__(self,n_snapshots,nx,ny):
+    def __init__(self,nx,ny,nxf,nyf,freq,n_snapshots):
         
         '''
         initialize the DHIT class
@@ -33,8 +33,11 @@ class DHIT:
         
         self.nx = nx
         self.ny = ny
+        self.nxf = nxf
+        self.nyf = nyf
+        self.freq = freq
         self.n_snapshots = n_snapshots
-        self.f_train,self.ue_train,self.f_test,self.ue_test = self.gen_data()
+        self.x_train,self.y_train,self.x_test,self.y_test = self.gen_data()
         
     def gen_data(self):
         
@@ -43,74 +46,78 @@ class DHIT:
 
         '''
         
-        n_snapshots_train = self.n_snapshots #- 10
-        n_snapshots_test = 50
+        x_train  = np.zeros(shape=(self.n_snapshots-1, self.nx+1, self.ny+1, 2), dtype='double')
+        y_train = np.zeros(shape=(self.n_snapshots-1, self.nx+1, self.ny+1, 3), dtype='double')
         
-        f_train  = np.zeros(shape=(n_snapshots_train, self.nx+1, self.ny+1, 5), dtype='double')
-        ue_train = np.zeros(shape=(n_snapshots_train, self.nx+1, self.ny+1, 1), dtype='double')
+        x_test  = np.zeros(shape=(1, self.nx+1, self.ny+1, 2), dtype='double')
+        y_test = np.zeros(shape=(1, self.nx+1, self.ny+1, 3), dtype='double')
         
-        f_test  = np.zeros(shape=(n_snapshots_test, self.nx+1, self.ny+1, 5), dtype='double')
-        ue_test = np.zeros(shape=(n_snapshots_test, self.nx+1, self.ny+1, 1), dtype='double')
-        
-        for n in range(1,n_snapshots_train+1):
-            file_input = "spectral/Re_4000/uc/uc_"+str(n)+".csv"
-            data_input = np.genfromtxt(file_input, delimiter=',')
-            f_train[n-1,:,:,0] = data_input
+        for m in range(1,self.n_snapshots):
+            folder = "data_"+ str(self.nxf) + "_" + str(self.nx) 
             
-            file_input = "spectral/Re_4000/vc/vc_"+str(n)+".csv"
+            file_input = "spectral/"+folder+"/uc/uc_"+str(self.freq*m)+".csv"
             data_input = np.genfromtxt(file_input, delimiter=',')
-            f_train[n-1,:,:,1] = data_input
+            x_train[m-1,:,:,0] = data_input
             
-            file_input = "spectral/Re_4000/uuc/uuc_"+str(n)+".csv"
+            file_input = "spectral/"+folder+"/vc/vc_"+str(self.freq*m)+".csv"
             data_input = np.genfromtxt(file_input, delimiter=',')
-            f_train[n-1,:,:,2] = data_input
+            x_train[m-1,:,:,1] = data_input
             
-            file_input = "spectral/Re_4000/uvc/uvc_"+str(n)+".csv"
-            data_input = np.genfromtxt(file_input, delimiter=',')
-            f_train[n-1,:,:,3] = data_input
-            
-            file_input = "spectral/Re_4000/vvc/vvc_"+str(n)+".csv"
-            data_input = np.genfromtxt(file_input, delimiter=',')
-            f_train[n-1,:,:,4] = data_input
+#            file_input = "spectral/"+folder+"/uuc/uuc_"+str(self.freq*m)+".csv"
+#            data_input = np.genfromtxt(file_input, delimiter=',')
+#            x_train[m-1,:,:,2] = data_input
+#            
+#            file_input = "spectral/"+folder+"/uvc/uvc_"+str(self.freq*m)+".csv"
+#            data_input = np.genfromtxt(file_input, delimiter=',')
+#            x_train[m-1,:,:,3] = data_input
+#            
+#            file_input = "spectral/"+folder+"/vvc/vvc_"+str(self.freq*m)+".csv"
+#            data_input = np.genfromtxt(file_input, delimiter=',')
+#            x_train[m-1,:,:,4] = data_input
                        
-            file_output = "spectral/Re_4000/true_shear_stress/t_"+str(n)+".csv"
+            file_output = "spectral/"+folder+"/true_shear_stress/t_"+str(self.freq*m)+".csv"
+#            file_output = "spectral/"+folder+"/nu_true/nut_"+str(self.freq*m)+".csv"
             data_output = np.genfromtxt(file_output, delimiter=',')
             data_output = data_output.reshape((3,self.nx+1,self.ny+1))
-            ue_train[n-1,:,:,0] = data_output[0,:,:] # tau_11
+            y_train[m-1,:,:,0] = data_output[0,:,:] # tau_11
+            y_train[m-1,:,:,1] = data_output[1,:,:] # tau_12
+            y_train[m-1,:,:,2] = data_output[2,:,:] # tau_22
+        
+        m = (self.n_snapshots)*self.freq
+        file_input = "spectral/"+folder+"/uc/uc_"+str(m)+".csv"
+        data_input = np.genfromtxt(file_input, delimiter=',')
+        x_test[0,:,:,0] = data_input
+        
+        file_input = "spectral/"+folder+"/vc/vc_"+str(m)+".csv"
+        data_input = np.genfromtxt(file_input, delimiter=',')
+        x_test[0,:,:,1] = data_input
+        
+#        file_input = "spectral/"+folder+"/uuc/uuc_"+str(m)+".csv"
+#        data_input = np.genfromtxt(file_input, delimiter=',')
+#        x_test[0,:,:,2] = data_input
+#        
+#        file_input = "spectral/"+folder+"/uvc/uvc_"+str(m)+".csv"
+#        data_input = np.genfromtxt(file_input, delimiter=',')
+#        x_test[0,:,:,3] = data_input
+#        
+#        file_input = "spectral/"+folder+"/vvc/vvc_"+str(m)+".csv"
+#        data_input = np.genfromtxt(file_input, delimiter=',')
+#        x_test[0,:,:,4] = data_input
+                   
+        file_output = "spectral/"+folder+"/true_shear_stress/t_"+str(m)+".csv"
+#        file_output = "spectral/"+folder+"/nu_true/nut_"+str(m)+".csv"
+        data_output = np.genfromtxt(file_output, delimiter=',')
+        data_output = data_output.reshape((3,self.nx+1,self.ny+1))
+        y_test[0,:,:,0] = data_output[0,:,:] # tau_11
+        y_test[0,:,:,1] = data_output[0,:,:] # tau_12
+        y_test[0,:,:,2] = data_output[0,:,:] # tau_22
             
-        for n in range(1,n_snapshots_test+1):
-            p = n #+ n_snapshots_train
-            file_input = "spectral/Re_8000/uc/uc_"+str(p)+".csv"
-            data_input = np.genfromtxt(file_input, delimiter=',')
-            f_test[n-1,:,:,0] = data_input
-            
-            file_input = "spectral/Re_8000/vc/vc_"+str(p)+".csv"
-            data_input = np.genfromtxt(file_input, delimiter=',')
-            f_test[n-1,:,:,1] = data_input
-            
-            file_input = "spectral/Re_8000/uuc/uuc_"+str(p)+".csv"
-            data_input = np.genfromtxt(file_input, delimiter=',')
-            f_test[n-1,:,:,2] = data_input
-            
-            file_input = "spectral/Re_8000/uvc/uvc_"+str(p)+".csv"
-            data_input = np.genfromtxt(file_input, delimiter=',')
-            f_test[n-1,:,:,3] = data_input
-            
-            file_input = "spectral/Re_8000/vvc/vvc_"+str(p)+".csv"
-            data_input = np.genfromtxt(file_input, delimiter=',')
-            f_test[n-1,:,:,4] = data_input
-                       
-            file_output = "spectral/Re_8000/true_shear_stress/t_"+str(p)+".csv"
-            data_output = np.genfromtxt(file_output, delimiter=',')
-            data_output = data_output.reshape((3,self.nx+1,self.ny+1))
-            ue_test[n-1,:,:,0] = data_output[0,:,:] # tau_11
-            
-        return f_train, ue_train, f_test, ue_test
+        return x_train, y_train, x_test, y_test
     
 #%%
 #A Convolutional Neural Network class
 class CNN:
-    def __init__(self,ue,f,nx,ny,nci,nco):
+    def __init__(self,x_train,y_train,nx,ny,nci,nco):
         
         '''
         initialize the CNN class
@@ -124,15 +131,15 @@ class CNN:
         nco : number of output labels
         '''
         
-        self.ue=ue
-        self.f=f
-        self.nx=nx
-        self.ny=ny
-        self.nci=nci
-        self.nco=nco
-        self.model = self.CNN(ue,f,nx,ny,nci,nco)
+        self.x_train = x_train
+        self.y_train = y_train
+        self.nx = nx
+        self.ny = ny
+        self.nci = nci
+        self.nco = nco
+        self.model = self.CNN(x_train,y_train,nx,ny,nci,nco)
         
-    def CNN(self,ue,f,nx,ny,nci,nco):
+    def CNN(self,x_train,y_train,nx,ny,nci,nco):
         
         '''
         define CNN model
@@ -190,7 +197,7 @@ class CNN:
         history_callback: return the loss history of CNN model training
         '''
         
-        history_callback = self.model.fit(self.f,self.ue,epochs=epochs,batch_size=batch_size, 
+        history_callback = self.model.fit(self.x_train,self.y_train,epochs=epochs,batch_size=batch_size, 
                                           validation_split= 0.15,)
         return history_callback
     
@@ -211,6 +218,15 @@ class CNN:
         
         loss = history_callback.history["loss"]
         val_loss = history_callback.history["val_loss"]
+        
+        epochs = range(1, len(loss) + 1)
+        plt.figure()
+        plt.semilogy(epochs, loss, 'b', label='Training loss')
+        plt.semilogy(epochs, val_loss, 'r', label='Validation loss')
+        plt.title('Training and validation loss')
+        plt.legend()
+        plt.show()
+        
         return loss, val_loss
             
     def CNN_predict(self,ftest):
@@ -251,111 +267,121 @@ class CNN:
         
 #%%
 # generate training and testing data for CNN
-obj = DHIT(n_snapshots=50,nx=64,ny=64)
-x_train,y_train = obj.f_train,obj.ue_train
-x_test,y_test = obj.f_test,obj.ue_test
-nt,nx,ny,nci=x_train.shape
-nt,nx,ny,nco=y_train.shape 
+freq = 1
+n_snapshots = 400
+nxf, nyf = 1024, 1024
+nx, ny = 64, 64
+
+#%%
+obj = DHIT(nx=nx,ny=ny,nxf=nxf,nyf=nyf,freq=freq,n_snapshots=n_snapshots)
+
+x_train,y_train = obj.x_train,obj.y_train
+x_test,y_test = obj.x_test,obj.y_test
+
+nt,nx_train,ny_train,nci = x_train.shape
+nt,nx_train,ny_train,nco = y_train.shape 
 
 #%%
 # train the CNN model and predict for the test data
-model=CNN(y_train,x_train,nx,ny,nci,nco)
+model = CNN(x_train,y_train,nx_train,ny_train,nci,nco)
 model.CNN_info()
 model.CNN_compile(optimizer='adam')
-history_callback = model.CNN_train(epochs=1000,batch_size=32)
-loss_history, val_loss_history = model.CNN_history(history_callback)
-model.CNN_save('savedmodel.h5')
-y_pred=model.CNN_predict(x_test)
 
 #%%
-# plt the training and validation loss history
-epochs = range(1, len(loss_history) + 1)
-plt.figure()
-plt.semilogy(epochs, loss_history, 'b', label='Training loss')
-plt.semilogy(epochs, val_loss_history, 'r', label='Validation loss')
-plt.title('Training and validation loss')
-plt.legend()
-plt.show()
+history_callback = model.CNN_train(epochs=1000,batch_size=32)
+loss_history, val_loss_history = model.CNN_history(history_callback)
+
+#%%
+model.CNN_save('CNN_model.h5')
+y_pred = model.CNN_predict(x_test)
+
+#%%
+folder = "data_"+ str(nxf) + "_" + str(nx) 
+m = n_snapshots*freq
+file_input = "spectral/"+folder+"/smag_shear_stress/ts_"+str(m)+".csv"
+ts = np.genfromtxt(file_input, delimiter=',')
+ts = ts.reshape((3,nx+1,ny+1))
+t11s = ts[0,:,:]
+t12s = ts[1,:,:]
+t22s = ts[2,:,:]
 
 #%%
 # histogram plot for shear stresses along with probability density function 
 # PDF formula: https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.norm.html
-nx = 64
-ny = 64
-
-y11t = y_test[49,:,:,0].flatten()
-mut = np.mean(y11t)
-sigmat = np.std(y11t)
-
-y11p = y_pred[49,:,:,0].flatten()
-mup = np.mean(y11p)
-sigmap = np.std(y11p)
-
-ts = np.genfromtxt('spectral/Re_8000/smag_shear_stress/ts_50.csv', delimiter=',') 
-ts = ts.reshape((3,nx+1,ny+1))
-y11s = ts[0,:,:].flatten()
-#y11s = ts[1,:,:].flatten()
-#y11s = ts[2,:,:].flatten()
-mus = np.mean(y11s)
-sigmas = np.std(y11s)
-
 num_bins = 64
 
-fig, axs = plt.subplots(1,2,figsize=(10,4.5))
+fig, axs = plt.subplots(1,3,figsize=(12,4))
 axs[0].set_yscale('log')
+axs[1].set_yscale('log')
+axs[2].set_yscale('log')
 
 # the histogram of the data
-ntrue, binst, patchest = axs[0].hist(y11t, num_bins, histtype='step', alpha=1, color='r',zorder=5,
-                                 linewidth=2.0,range=(-4*sigmat,4*sigmat),density=True,label="True")
+axs[0].hist(y_test[0,:,:,0].flatten(), num_bins, histtype='step', alpha=1, color='r',zorder=5,
+           linewidth=2.0,range=(-4*np.std(y_test[0,:,:,0]),4*np.std(y_test[0,:,:,0])),density=True,label="True")
 
-npred, binsp, patchesp = axs[0].hist(y11p, num_bins, histtype='step', alpha=1,color='b',zorder=10,
-                                 linewidth=2.0,range=(-4*sigmat,4*sigmat),density=True,label="CNN")
+axs[0].hist(y_pred[0,:,:,0].flatten(), num_bins, histtype='step', alpha=1,color='b',zorder=10,
+           linewidth=2.0,range=(-4*np.std(y_test[0,:,:,0]),4*np.std(y_test[:,0])),density=True,label="CNN")
 
-nsmag, binss, patchess = axs[0].hist(y11s, num_bins, histtype='step', alpha=1,color='g',zorder=10,
-                                 linewidth=2.0,range=(-4*sigmat,4*sigmat),density=True,label="Smag")
+axs[0].hist(t11s.flatten(), num_bins, histtype='step', alpha=1,color='g',zorder=10,
+            linewidth=2.0,range=(-4*np.std(y_test[:,0]),4*np.std(y_test[:,0])),density=True,label=r"$C_s=0.18$")
 
-x_ticks = np.arange(-4*sigmat, 4.1*sigmat, sigmat)                                  
+x_ticks = np.arange(-4*np.std(y_test[0,:,:,0]), 4.1*np.std(y_test[0,:,:,0]), np.std(y_test[0,:,:,0]))                                  
 x_labels = [r"${} \sigma$".format(i) for i in range(-4,5)]
-
-
-axs[0].set_title(r"$\tau_{22}$")
+axs[0].set_title(r"$\tau_{11}$")
 axs[0].set_xticks(x_ticks)                                                           
 axs[0].set_xticklabels(x_labels)              
-
-# Tweak spacing to prevent clipping of ylabel
 axs[0].legend()
 
-x_plott = np.linspace(min(y11t), max(y11t), 1000)
-x_plotp = np.linspace(min(y11p), max(y11p), 1000)
-x_plots = np.linspace(min(y11s), max(y11s), 1000)
+#------#
+axs[1].hist(y_test[0,:,:,1].flatten(), num_bins, histtype='step', alpha=1, color='r',zorder=5,
+           linewidth=2.0,range=(-4*np.std(y_test[0,:,:,1]),4*np.std(y_test[0,:,:,1])),density=True,label="True")
 
-axs[1].plot(x_plott, norm.pdf(x_plott, mut, sigmat), 'r-', lw=3, label="True")
-axs[1].plot(x_plotp, norm.pdf(x_plotp, mup, sigmap), 'b-', lw=3, label="CNN")
-axs[1].plot(x_plots, norm.pdf(x_plots, mus, sigmas), 'g-', lw=3, label="Smag")       
-                                                    
-axs[1].legend(loc='best')
+axs[1].hist(y_pred[0,:,:,1].flatten(), num_bins, histtype='step', alpha=1,color='b',zorder=10,
+           linewidth=2.0,range=(-4*np.std(y_test[0,:,:,1]),4*np.std(y_test[0,:,:,1])),density=True,label="CNN")
 
-axs[1].set_xlim(-4*sigmat,4*sigmat)  
-axs[1].set_title(r"$\tau_{22}$")                     
+axs[1].hist(t12s.flatten(), num_bins, histtype='step', alpha=1,color='g',zorder=10,
+            linewidth=2.0,range=(-4*np.std(y_test[0,:,:,1]),4*np.std(y_test[0,:,:,1])),density=True,label=r"$C_s=0.18$")
+
+x_ticks = np.arange(-4*np.std(y_test[0,:,:,1]), 4.1*np.std(y_test[0,:,:,1]), np.std(y_test[0,:,:,1]))                                  
+x_labels = [r"${} \sigma$".format(i) for i in range(-4,5)]
+axs[1].set_title(r"$\tau_{12}$")
 axs[1].set_xticks(x_ticks)                                                           
 axs[1].set_xticklabels(x_labels)              
+axs[1].legend()
+
+#------#
+axs[2].hist(y_test[0,:,:,2].flatten(), num_bins, histtype='step', alpha=1, color='r',zorder=5,
+           linewidth=2.0,range=(-4*np.std(y_test[0,:,:,2]),4*np.std(y_test[0,:,:,2])),density=True,label="True")
+
+axs[2].hist(y_pred[0,:,:,2].flatten(), num_bins, histtype='step', alpha=1,color='b',zorder=10,
+           linewidth=2.0,range=(-4*np.std(y_test[0,:,:,2]),4*np.std(y_test[0,:,:,2])),density=True,label="CNN")
+
+axs[2].hist(t22s.flatten(), num_bins, histtype='step', alpha=1,color='g',zorder=10,
+            linewidth=2.0,range=(-4*np.std(y_test[0,:,:,2]),4*np.std(y_test[0,:,:,2])),density=True,label=r"$C_s=0.18$")
+
+x_ticks = np.arange(-4*np.std(y_test[0,:,:,2]), 4.1*np.std(y_test[0,:,:,2]), np.std(y_test[0,:,:,2]))                                  
+x_labels = [r"${} \sigma$".format(i) for i in range(-4,5)]
+axs[2].set_title(r"$\tau_{22}$")
+axs[2].set_xticks(x_ticks)                                                           
+axs[2].set_xticklabels(x_labels)              
+axs[2].legend()
 
 fig.tight_layout()
 plt.show()
 
-fig.savefig("extrapolation_t11.pdf", bbox_inches = 'tight')
+fig.savefig("ts_cnn.pdf", bbox_inches = 'tight')
 
 #%%
 # contour plot of shear stresses
 fig, axs = plt.subplots(1,3,sharey=True,figsize=(10.5,3.5))
 
-cs = axs[0].contourf(y_test[4,:,:,0].T, 120, cmap = 'jet', interpolation='bilinear')
+cs = axs[0].contourf(y_test[0,:,:,0].T, 120, cmap = 'jet', interpolation='bilinear')
 axs[0].text(0.4, -0.1, 'True', transform=axs[0].transAxes, fontsize=14, va='top')
 
-cs = axs[1].contourf(y_test[4,:,:,0].T, 120, cmap = 'jet', interpolation='bilinear')
+cs = axs[1].contourf(y_test[0,:,:,1].T, 120, cmap = 'jet', interpolation='bilinear')
 axs[1].text(0.4, -0.1, 'CNN', transform=axs[1].transAxes, fontsize=14, va='top')
 
-cs = axs[2].contourf(ts[0,:,:].T, 120, cmap = 'jet', interpolation='bilinear')
+cs = axs[2].contourf(t11s.T, 120, cmap = 'jet', interpolation='bilinear')
 axs[2].text(0.4, -0.1, 'Smag', transform=axs[2].transAxes, fontsize=14, va='top')
 
 fig.tight_layout() 
@@ -365,4 +391,5 @@ fig.subplots_adjust(bottom=0.15)
 cbar_ax = fig.add_axes([0.22, -0.05, 0.6, 0.04])
 fig.colorbar(cs, cax=cbar_ax, orientation='horizontal')
 plt.show()
+
 

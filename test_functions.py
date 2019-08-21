@@ -214,48 +214,49 @@ t = np.genfromtxt(file_input, delimiter=',')
 t = t.reshape((3,65,65))
 t11c = t[0,:,:]
 t12c = t[1,:,:]
-t22c = t[2,:,:]    nu = np.genfromtxt(file_input, delimiter=',')
+t22c = t[2,:,:]    
+nu = np.genfromtxt(file_input, delimiter=',')
     
-    nx,ny = uc.shape
-    nt = int((nx-2)*(ny-2))
-    
-    x_t = np.zeros((nt,18))
-    y_t = np.zeros((nt,1))
-    
-    n = 0
-    for i in range(1,nx-1):
-        for j in range(1,ny-1):
-            x_t[n,0],x_t[n,9] = uc[i,j], vc[i,j]
-            x_t[n,1],x_t[n,10] = uc[i,j-1], vc[i,j-1]
-            x_t[n,2],x_t[n,11] = uc[i,j+1], vc[i,j+1]
-            x_t[n,3],x_t[n,12] = uc[i-1,j], vc[i-1,j]
-            x_t[n,4],x_t[n,13] = uc[i+1,j], vc[i+1,j]
-            x_t[n,5],x_t[n,14] = uc[i-1,j-1], vc[i-1,j-1]
-            x_t[n,6],x_t[n,15] = uc[i-1,j+1], vc[i-1,j+1]
-            x_t[n,7],x_t[n,16] = uc[i+1,j-1], vc[i+1,j-1]
-            x_t[n,8],x_t[n,17] = uc[i+1,j+1], vc[i+1,j+1]
-            
-            y_t[n,0] = nu[i,j]
-            n = n+1
-    
-    if m == 1:
-        x_train = x_t
-        y_train = y_t
-    else:
-        x_train = np.vstack((x_train,x_t))
-        y_train = np.vstack((y_train,y_t))
+nx,ny = uc.shape
+nt = int((nx-2)*(ny-2))
+
+x_t = np.zeros((nt,18))
+y_t = np.zeros((nt,1))
+
+n = 0
+for i in range(1,nx-1):
+    for j in range(1,ny-1):
+        x_t[n,0],x_t[n,9] = uc[i,j], vc[i,j]
+        x_t[n,1],x_t[n,10] = uc[i,j-1], vc[i,j-1]
+        x_t[n,2],x_t[n,11] = uc[i,j+1], vc[i,j+1]
+        x_t[n,3],x_t[n,12] = uc[i-1,j], vc[i-1,j]
+        x_t[n,4],x_t[n,13] = uc[i+1,j], vc[i+1,j]
+        x_t[n,5],x_t[n,14] = uc[i-1,j-1], vc[i-1,j-1]
+        x_t[n,6],x_t[n,15] = uc[i-1,j+1], vc[i-1,j+1]
+        x_t[n,7],x_t[n,16] = uc[i+1,j-1], vc[i+1,j-1]
+        x_t[n,8],x_t[n,17] = uc[i+1,j+1], vc[i+1,j+1]
+        
+        y_t[n,0] = nu[i,j]
+        n = n+1
+
+if m == 1:
+    x_train = x_t
+    y_train = y_t
+else:
+    x_train = np.vstack((x_train,x_t))
+    y_train = np.vstack((y_train,y_t))
 
 #%% field plotting
 nx,ny = 64,64
-m = 200
-file_input = "spectral/data_1024/nu_true/nut_"+str(m)+".csv"
+m = 400
+file_input = "spectral/data_1024_64/nu_true/nut_"+str(m)+".csv"
 nu = np.genfromtxt(file_input, delimiter=',')
 nu = nu.reshape((3,nx+1,ny+1))
 nu11 = nu[0,:,:]
 nu12 = nu[1,:,:]
 nu22 = nu[2,:,:]
 
-file_input = "spectral/data_1024/true_shear_stress/t_"+str(m)+".csv"
+file_input = "spectral/data_1024_64/true_shear_stress/t_"+str(m)+".csv"
 t = np.genfromtxt(file_input, delimiter=',')
 t = t.reshape((3,nx+1,ny+1))
 t11 = t[0,:,:]
@@ -266,15 +267,26 @@ t22 = t[2,:,:]
 file_input = "spectral/data_1024/04_vorticity/w_"+str(m)+".csv"
 w = np.genfromtxt(file_input, delimiter=',')
 
-fig, ax = plt.subplots(1,1,sharey=True,figsize=(6,5))
-cs = ax.contourf(w.T,120, cmap = 'jet', interpolation='bilinear')
-fig.colorbar(cs)
-ax.set_title(r"$\omega$")
+file_input = "spectral/data_1024_64/00_wc/wc_"+str(m)+".csv"
+wc = np.genfromtxt(file_input, delimiter=',')
+
+fig, axs = plt.subplots(1,2,figsize=(10,4))
+
+cs = axs[0].contourf(w.T,120, cmap = 'jet', interpolation='bilinear')
+fig.colorbar(cs, ax = axs[0])
+axs[0].set_title(r"$\omega$")
+
+cs = axs[1].contourf(wc.T,120, cmap = 'jet', interpolation='bilinear')
+fig.colorbar(cs, ax = axs[1])
+axs[1].set_title(r"$\omega_c$")
+
+plt.show()
+fig.savefig('vorticity.pdf')
 
 #%%
-fig, axs = plt.subplots(2,3,sharey=True,figsize=(12,7))
+fig, axs = plt.subplots(2,3,sharey=True,figsize=(12,6))
 
-v = np.linspace(-1, 1., 15, endpoint=True)
+v = np.linspace(-1, 1., 8, endpoint=True)
 
 cs = axs[0,0].contourf(nu11.T,levels=v,cmap=cm.jet,extend="both")
 fig.colorbar(cs,ticks = v,ax = axs[0,0])
@@ -288,17 +300,73 @@ cs = axs[0,2].contourf(nu22.T,levels=v,cmap=cm.jet,extend="both")
 fig.colorbar(cs,ticks = v,ax = axs[0,2])
 axs[0,2].set_title(r"$\nu_{22}$")
 
-v = np.linspace(-0.1, 0.1, 15, endpoint=True)
-cs = axs[1,0].contourf(t11.T,levels=v,cmap=cm.jet,extend="both")
+v11 = np.linspace(-0.2, 0.2, 8, endpoint=True)
+v12 = np.linspace(-0.2, 0.2, 8, endpoint=True)
+v22 = np.linspace(-0.2, 0.2, 8, endpoint=True)
+
+cs = axs[1,0].contourf(t11.T,levels=v11,cmap=cm.jet,extend="both")
 fig.colorbar(cs,ticks = v,ax = axs[1,0])
 axs[1,0].set_title(r"$\tau_{11}$")
 
-cs = axs[1,1].contourf(t12.T,levels=v,cmap=cm.jet,extend="both")
+cs = axs[1,1].contourf(t12.T,levels=v12,cmap=cm.jet,extend="both")
 fig.colorbar(cs,ticks = v,ax = axs[1,1])
 axs[1,1].set_title(r"$\tau_{12}$")
 
-cs = axs[1,2].contourf(t22.T,levels=v,cmap=cm.jet,extend="both")
+cs = axs[1,2].contourf(t22.T,levels=v22,cmap=cm.jet,extend="both")
 fig.colorbar(cs,ticks = v,ax = axs[1,2])
 axs[1,2].set_title(r"$\tau_{22}$")
 
 plt.show()
+fig.savefig('nu_stresses.pdf')
+
+#%%
+file_input = "spectral/data_1024_64/ucx/ucx_"+str(m)+".csv"
+ucx = np.genfromtxt(file_input, delimiter=',')
+
+file_input = "spectral/data_1024_64/ucy/ucy_"+str(m)+".csv"
+ucy = np.genfromtxt(file_input, delimiter=',')
+
+file_input = "spectral/data_1024_64/vcx/vcx_"+str(m)+".csv"
+vcx = np.genfromtxt(file_input, delimiter=',')
+
+file_input = "spectral/data_1024_64/vcy/vcy_"+str(m)+".csv"
+vcy = np.genfromtxt(file_input, delimiter=',')
+
+fig, axs = plt.subplots(2,2,sharey=True,figsize=(10,8))
+
+v = np.linspace(-6, 6., 8, endpoint=True)
+cs = axs[0,0].contourf(ucx.T,levels=v,cmap=cm.jet,extend="both")
+fig.colorbar(cs,ticks = v,ax = axs[0,0])
+axs[0,0].set_title(r"$\frac{\partial u_c}{\partial x}$")
+
+v = np.linspace(-10, 10., 8, endpoint=True)
+cs = axs[0,1].contourf(ucy.T,levels=v,cmap=cm.jet,extend="both")
+fig.colorbar(cs,ticks = v,ax = axs[0,1])
+axs[0,1].set_title(r"$\frac{\partial u_c}{\partial y}$")
+
+v = np.linspace(-14, 14., 8, endpoint=True)
+cs = axs[1,0].contourf(vcx.T,levels=v,cmap=cm.jet,extend="both")
+fig.colorbar(cs,ticks = v,ax = axs[1,0])
+axs[1,0].set_title(r"$\frac{\partial v_c}{\partial x}$")
+
+v = np.linspace(-7, 7., 8, endpoint=True)
+cs = axs[1,1].contourf(vcy.T,levels=v,cmap=cm.jet,extend="both")
+fig.colorbar(cs,ticks = v,ax = axs[1,1])
+axs[1,1].set_title(r"$\frac{\partial v_c}{\partial y}$")
+
+plt.show()
+fig.savefig('velocity_gradients.pdf')
+
+
+
+
+
+
+
+
+
+
+
+
+
+
