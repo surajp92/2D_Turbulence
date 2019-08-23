@@ -20,6 +20,7 @@ import time as tm
 import matplotlib.ticker as ticker
 import os
 from numba import jit
+import csv
 
 from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.pyplot as plt
@@ -313,6 +314,7 @@ def write_data(uc,vc,uuc,uvc,vvc,ucx,ucy,vcx,vcy,S,t,t_s,C,nu_s,nu_t):
         os.makedirs("spectral/"+folder+"/vcx")
         os.makedirs("spectral/"+folder+"/vcy")
         os.makedirs("spectral/"+folder+"/Sc")
+        os.makedirs("spectral/"+folder+"/cs2")
         os.makedirs("spectral/"+folder+"/gp/ucx")
         os.makedirs("spectral/"+folder+"/gp/ucy")
         os.makedirs("spectral/"+folder+"/gp/vcx")
@@ -320,6 +322,10 @@ def write_data(uc,vc,uuc,uvc,vvc,ucx,ucy,vcx,vcy,S,t,t_s,C,nu_s,nu_t):
         os.makedirs("spectral/"+folder+"/gp/Sc")
         os.makedirs("spectral/"+folder+"/gp/true")
         os.makedirs("spectral/"+folder+"/gp/smag")
+        
+        with open("spectral/"+folder+"/cs2/cs2.csv", 'a') as csvFile:
+            writer = csv.writer(csvFile)
+            writer.writerow(['n', 'CS2'])
         
     filename = "spectral/"+folder+"/uc/uc_"+str(int(n))+".csv"
     np.savetxt(filename, uc, delimiter=",")
@@ -345,6 +351,10 @@ def write_data(uc,vc,uuc,uvc,vvc,ucx,ucy,vcx,vcy,S,t,t_s,C,nu_s,nu_t):
     np.savetxt(filename, vcy, delimiter=",")
     filename = "spectral/"+folder+"/Sc/Sc_"+str(int(n))+".csv"
     np.savetxt(filename, S, delimiter=",")
+    
+    with open("spectral/"+folder+"/cs2/cs2.csv", 'a') as csvFile:
+            writer = csv.writer(csvFile)
+            writer.writerow([str(n), str(np.mean(C))])
         
     with open("spectral/"+folder+"/true_shear_stress/t_"+str(int(n))+".csv", 'w') as outfile:
         outfile.write('# Array shape: {0}\n'.format(t.shape))
@@ -378,7 +388,19 @@ def write_data(uc,vc,uuc,uvc,vvc,ucx,ucy,vcx,vcy,S,t,t_s,C,nu_s,nu_t):
     np.save(filename, t.reshape(int(3*(nxc+1)),int(nyc+1)))
     filename = "spectral/"+folder+"/gp/smag/ts_"+str(int(n))+".npy"
     np.save(filename, t_s.reshape(int(3*(nxc+1)),int(nyc+1)))
+
+#%%
+def write_data_dyn(L,M):
     
+    folder = "data_"+ str(nx) + "_" + str(nxc) + "_V2"
+    if not os.path.exists("spectral/"+folder+"/L"):
+        os.makedirs("spectral/"+folder+"/L")
+        os.makedirs("spectral/"+folder+"/M")   
+    
+    filename = "spectral/"+folder+"/L/L_"+str(int(n))+".csv"
+    np.savetxt(filename, L, delimiter=",")
+    filename = "spectral/"+folder+"/M/M_"+str(int(n))+".csv"
+    np.savetxt(filename, M, delimiter=",")
     
     
 #%%
@@ -517,28 +539,18 @@ def compute_cs_smag(dxc,dyc,nxc,nyc,uc,vc,dac,d11c,d12c,d22c,ics,ifltr,alpha):
     bb = (m11*m11 + 2.0*(m12*m12) + m22*m22)
     
     if ics == 1:
+        write_data_dyn(aa,bb)
 #        CS2 = (aa)/(2.0*bb)  #Germano
-#        CS2 = CS2.clip(0.0)
 #        x = np.linspace(0.0,2.0*np.pi,nxc+1)
 #        y = np.linspace(0.0,2.0*np.pi,nxc+1)
-#        ai = simps(simps(aa[0:nxc+2,0:nyc+2],y),x)
-#        bi = simps(simps(bb[0:nxc+2,0:nyc+2],y),x)
+#        ai = simps(simps(aa + abs(aa),y),x)
+#        bi = simps(simps(bb,y),x)
 #        CS2 = (ai/bi)*np.ones((nxc+1,nyc+1))
-        CS2 = (np.sum(aa + abs(aa))/np.sum(bb))*np.ones((nxc+1,nyc+1))
+        CS2 = (np.sum(0.5*(aa + abs(aa)))/np.sum(bb))*np.ones((nxc+1,nyc+1))
         
     elif ics == 2:
         #CS2 = 0.04*np.ones((nxc+1,nyc+1)) # constant
         CS2 = 0.18**2*np.ones((nxc+1,nyc+1)) # constant
-        
-    
-#    x = np.linspace(0.0,2.0*np.pi,nxc+1)
-#    y = np.linspace(0.0,2.0*np.pi,nxc+1)
-#    ai = simps(simps(a[0:nxc+2,0:nyc+2],y),x)
-#    bi = simps(simps(b[0:nxc+2,0:nyc+2],y),x)
-#    
-#    CS2i = ai/bi # using integration Lilly
-#    CS2 = (np.sum(a)/np.sum(b))     #Lilly
-    #CS2 = np.abs(np.sum(a)/np.sum(b))     #Lilly
     
     return CS2
 

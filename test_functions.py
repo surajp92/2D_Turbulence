@@ -357,10 +357,41 @@ axs[1,1].set_title(r"$\frac{\partial v_c}{\partial y}$")
 plt.show()
 fig.savefig('velocity_gradients.pdf')
 
+#%%
+freq = 1
+n_snapshots = 400
+nxf, nyf = 1024, 1024
+nx, ny = 64, 64
 
+folder = "data_"+ str(nxf) + "_" + str(nx) + "_V2" 
+m = n_snapshots*freq
 
+file_input = "spectral/"+folder+"/L/L_"+str(m)+".csv"
+LM = np.genfromtxt(file_input, delimiter=',')
 
+file_input = "spectral/"+folder+"/M/M_"+str(m)+".csv"
+MM = np.genfromtxt(file_input, delimiter=',')
 
+x = MM.flatten()
+y = LM.flatten()
+
+#%%
+fig, axs = plt.subplots(1,2,figsize=(11,4))
+
+axs[0].loglog(x,y,lw=0.0,marker="o")
+axs[0].set_xlabel(r"$<M_{ij}M_{ij}>$")
+axs[0].set_ylabel(r"$<L_{ij}M_{ij}>$")
+
+axs[1].scatter(MM,abs(LM))
+axs[1].set_yscale('log')
+axs[1].set_xscale('log')
+
+axs[1].set_xlim([10e-6,10e1])
+axs[1].set_ylim([10e-6,10e0])
+
+#axs.legend(loc='upper left')
+
+plt.show()
 
 
 
