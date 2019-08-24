@@ -21,6 +21,8 @@ from tensorflow import set_random_seed
 set_random_seed(2)
 from sklearn.model_selection import train_test_split
 from keras.regularizers import l2
+from utils import *
+import os
 
 #%%
 #Class of problem to solve 2D decaying homogeneous isotrpic turbulence
@@ -266,7 +268,7 @@ class DHIT:
 #%%
 #A Convolutional Neural Network class
 class DNN:
-    def __init__(self,x_train,y_train,x_valid,y_valid,nf,nl):
+    def __init__(self,x_train,y_train,x_valid,y_valid,nf,nl,n_layers,n_neurons):
         
         '''
         initialize the CNN class
@@ -285,6 +287,8 @@ class DNN:
         self.y_valid = y_valid
         self.nf = nf
         self.nl = nl
+        self.n_layers = n_layers
+        self.n_neurons = n_neurons
         self.model = self.DNN(x_train,y_train,nf,nl)
     
     def coeff_determination(self,y_true, y_pred):
@@ -314,10 +318,9 @@ class DNN:
         #model.add(Dropout(0.2))
         input_layer = Input(shape=(self.nf,))
         
-        x = Dense(60, activation='relu',  use_bias=True)(input_layer)
-        x = Dense(60, activation='relu',  use_bias=True)(x)
-#        x = Dense(100, activation='relu',  use_bias=True)(x)
-#        x = Dense(100, activation='relu',  use_bias=True)(x)
+        x = Dense(self.n_neurons[0], activation='relu',  use_bias=True)(input_layer)
+        for i in range(1,self.n_layers):
+            x = Dense(self.n_neurons[i], activation='relu',  use_bias=True)(x)
         
         output_layer = Dense(nl, activation='linear', use_bias=True)(x)
         
@@ -434,6 +437,11 @@ istencil = np.int64(l1[4][0])    # 1: nine point, 2: single point
 ifeatures = np.int64(l1[5][0])   # 1: 6 features, 2: 2 features 
 ilabel = np.int64(l1[6][0])      # 1: SGS (tau), 2: eddy-viscosity (nu)
 
+#%% 
+# hyperparameters initilization
+n_layers = 2
+n_neurons = [60,60]
+
 #%%
 obj = DHIT(nx=nx,ny=ny,nxf=nxf,nyf=nyf,freq=freq,n_snapshots=n_snapshots, 
            istencil=istencil,ifeatures=ifeatures,ilabel=ilabel)
@@ -461,7 +469,7 @@ ns_train,nl = y_train.shape
 
 #%%
 # train the CNN model and predict for the test data
-model=DNN(x_train,y_train,x_valid,y_valid,nf,nl)
+model=DNN(x_train,y_train,x_valid,y_valid,nf,nl,n_layers,n_neurons)
 model.DNN_info()
 model.DNN_compile()
 
@@ -473,6 +481,8 @@ loss, val_loss = model.DNN_history(history_callback)
 #y_pred = model.DNN_predict(x_test)
 y_pred_sc = model.DNN_predict(x_test_sc)
 y_pred = sc_output.inverse_transform(y_pred_sc)
+
+export_resutls(y_test, y_pred, ilabel, nxf, nx, n=1, nn = 1)
 
 #%%
 folder = "data_"+ str(nxf) + "_" + str(nx) 

@@ -15,6 +15,8 @@ from numpy.random import seed
 seed(1)
 from tensorflow import set_random_seed
 set_random_seed(2)
+from utils import *
+import os
 
 #%%
 #Class of problem to solve 2D decaying homogeneous isotrpic turbulence
@@ -403,6 +405,7 @@ for i in range(3):
     y_pred[0,:,:,i] = 0.5*(y_pred_sc[0,:,:,i]*(max_min[i+6,0] - max_min[i+6,1]) + (max_min[i+6,0] + max_min[i+6,1]))
     y_test[0,:,:,i] = 0.5*(y_test_sc[0,:,:,i]*(max_min[i+6,0] - max_min[i+6,1]) + (max_min[i+6,0] + max_min[i+6,1]))    
 
+export_resutls(y_test[0], y_pred[0], ilabel, nxf, nx, n=1, nn = 2)
 
 #%%
 folder = "data_"+ str(nxf) + "_" + str(nx) + "_V2"
