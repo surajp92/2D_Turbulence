@@ -21,7 +21,8 @@ import os
 #%%
 #Class of problem to solve 2D decaying homogeneous isotrpic turbulence
 class DHIT:
-    def __init__(self,nx,ny,nxf,nyf,freq,n_snapshots,istencil,ifeatures,ilabel):
+    def __init__(self,nx,ny,nxf,nyf,freq,n_snapshots,n_snapshots_train,n_snapshots_test,
+                 istencil,ifeatures,ilabel):
         
         '''
         initialize the DHIT class
@@ -39,11 +40,13 @@ class DHIT:
         self.nyf = nyf
         self.freq = freq
         self.n_snapshots = n_snapshots
+        self.n_snapshots_train = n_snapshots_train
+        self.n_snapshots_test = n_snapshots_test
         self.istencil = istencil
         self.ifeatures = ifeatures
         self.ilabel = ilabel
         
-        self.max_min =  np.zeros(shape=(10, 2), dtype='double')
+        self.max_min =  np.zeros(shape=(14, 2), dtype='double')
         
         self.uc = np.zeros(shape=(self.n_snapshots, self.nx+1, self.ny+1), dtype='double')
         self.vc = np.zeros(shape=(self.n_snapshots, self.nx+1, self.ny+1), dtype='double')
@@ -51,6 +54,10 @@ class DHIT:
         self.ucy = np.zeros(shape=(self.n_snapshots, self.nx+1, self.ny+1), dtype='double')
         self.vcx = np.zeros(shape=(self.n_snapshots, self.nx+1, self.ny+1), dtype='double')
         self.vcy = np.zeros(shape=(self.n_snapshots, self.nx+1, self.ny+1), dtype='double')
+        self.ucxx = np.zeros(shape=(self.n_snapshots, self.nx+1, self.ny+1), dtype='double')
+        self.ucyy = np.zeros(shape=(self.n_snapshots, self.nx+1, self.ny+1), dtype='double')
+        self.vcxx = np.zeros(shape=(self.n_snapshots, self.nx+1, self.ny+1), dtype='double')
+        self.vcyy = np.zeros(shape=(self.n_snapshots, self.nx+1, self.ny+1), dtype='double')
         self.t11 = np.zeros(shape=(self.n_snapshots, self.nx+1, self.ny+1), dtype='double')
         self.t12 = np.zeros(shape=(self.n_snapshots, self.nx+1, self.ny+1), dtype='double')
         self.t22 = np.zeros(shape=(self.n_snapshots, self.nx+1, self.ny+1), dtype='double')
@@ -83,6 +90,22 @@ class DHIT:
             data_input = np.genfromtxt(file_input, delimiter=',')
             self.vcy[m-1,:,:] = data_input
             
+            file_input = "spectral/"+folder+"/ucxx/ucxx_"+str(self.freq*m)+".csv"
+            data_input = np.genfromtxt(file_input, delimiter=',')
+            self.ucxx[m-1,:,:] = data_input
+            
+            file_input = "spectral/"+folder+"/ucyy/ucyy_"+str(self.freq*m)+".csv"
+            data_input = np.genfromtxt(file_input, delimiter=',')
+            self.ucyy[m-1,:,:] = data_input
+            
+            file_input = "spectral/"+folder+"/vcxx/vcxx_"+str(self.freq*m)+".csv"
+            data_input = np.genfromtxt(file_input, delimiter=',')
+            self.vcxx[m-1,:,:] = data_input
+            
+            file_input = "spectral/"+folder+"/vcyy/vcyy_"+str(self.freq*m)+".csv"
+            data_input = np.genfromtxt(file_input, delimiter=',')
+            self.vcyy[m-1,:,:] = data_input
+            
             file_output = "spectral/"+folder+"/true_shear_stress/t_"+str(self.freq*m)+".csv"
             data_output = np.genfromtxt(file_output, delimiter=',')
             data_output = data_output.reshape((3,self.nx+1,self.ny+1))
@@ -112,10 +135,14 @@ class DHIT:
         self.max_min[3,0], self.max_min[3,1] = np.max(self.ucy), np.min(self.ucy)
         self.max_min[4,0], self.max_min[4,1] = np.max(self.vcx), np.min(self.vcx)
         self.max_min[5,0], self.max_min[5,1] = np.max(self.vcy), np.min(self.vcy)
-        self.max_min[6,0], self.max_min[6,1] = np.max(self.t11), np.min(self.t11)
-        self.max_min[7,0], self.max_min[7,1] = np.max(self.t12), np.min(self.t12)
-        self.max_min[8,0], self.max_min[8,1] = np.max(self.t22), np.min(self.t22)
-        self.max_min[9,0], self.max_min[9,1] = np.max(self.nu), np.min(self.nu)
+        self.max_min[6,0], self.max_min[6,1] = np.max(self.ucxx), np.min(self.ucxx)
+        self.max_min[7,0], self.max_min[7,1] = np.max(self.ucyy), np.min(self.ucyy)
+        self.max_min[8,0], self.max_min[8,1] = np.max(self.vcxx), np.min(self.vcxx)
+        self.max_min[9,0], self.max_min[9,1] = np.max(self.vcyy), np.min(self.vcyy)
+        self.max_min[10,0], self.max_min[10,1] = np.max(self.t11), np.min(self.t11)
+        self.max_min[11,0], self.max_min[11,1] = np.max(self.t12), np.min(self.t12)
+        self.max_min[12,0], self.max_min[12,1] = np.max(self.t22), np.min(self.t22)
+        self.max_min[13,0], self.max_min[13,1] = np.max(self.nu), np.min(self.nu)
         
         self.uc = (2.0*self.uc - (np.max(self.uc) + np.min(self.uc)))/(np.max(self.uc) - np.min(self.uc))
         self.vc = (2.0*self.vc - (np.max(self.vc) + np.min(self.vc)))/(np.max(self.vc) - np.min(self.vc))
@@ -123,6 +150,10 @@ class DHIT:
         self.ucy = (2.0*self.ucy - (np.max(self.ucy) + np.min(self.ucy)))/(np.max(self.ucy) - np.min(self.ucy))
         self.vcx = (2.0*self.vcx - (np.max(self.vcx) + np.min(self.vcx)))/(np.max(self.vcx) - np.min(self.vcx))
         self.vcy = (2.0*self.vcy - (np.max(self.vcy) + np.min(self.vcy)))/(np.max(self.vcy) - np.min(self.vcy))
+        self.ucxx = (2.0*self.ucxx - (np.max(self.ucxx) + np.min(self.ucxx)))/(np.max(self.ucxx) - np.min(self.ucxx))
+        self.ucyy = (2.0*self.ucyy - (np.max(self.ucyy) + np.min(self.ucyy)))/(np.max(self.ucyy) - np.min(self.ucyy))
+        self.vcxx = (2.0*self.vcxx - (np.max(self.vcxx) + np.min(self.vcxx)))/(np.max(self.vcxx) - np.min(self.vcxx))
+        self.vcyy = (2.0*self.vcyy - (np.max(self.vcyy) + np.min(self.vcyy)))/(np.max(self.vcyy) - np.min(self.vcyy))
         
         self.t11 = (2.0*self.t11 - (np.max(self.t11) + np.min(self.t11)))/(np.max(self.t11) - np.min(self.t11))
         self.t12 = (2.0*self.t12 - (np.max(self.t12) + np.min(self.t12)))/(np.max(self.t12) - np.min(self.t12))
@@ -139,16 +170,16 @@ class DHIT:
         '''
         
         if self.ifeatures == 1:
-            x_train  = np.zeros(shape=(self.n_snapshots-1, self.nx+1, self.ny+1, 6), dtype='double')
+            x_train  = np.zeros(shape=(self.n_snapshots_train, self.nx+1, self.ny+1, 10), dtype='double')
         elif self.ifeatures == 2:
-            x_train  = np.zeros(shape=(self.n_snapshots-1, self.nx+1, self.ny+1, 2), dtype='double')
+            x_train  = np.zeros(shape=(self.n_snapshots_train, self.nx+1, self.ny+1, 2), dtype='double')
             
         if self.ilabel == 1:
-            y_train = np.zeros(shape=(self.n_snapshots-1, self.nx+1, self.ny+1, 3), dtype='double')
+            y_train = np.zeros(shape=(self.n_snapshots_train, self.nx+1, self.ny+1, 3), dtype='double')
         elif self.ilabel == 2:
-            y_train = np.zeros(shape=(self.n_snapshots-1, self.nx+1, self.ny+1, 1), dtype='double')
+            y_train = np.zeros(shape=(self.n_snapshots_train, self.nx+1, self.ny+1, 1), dtype='double')
         
-        for m in range(1,self.n_snapshots):
+        for m in range(1,self.n_snapshots_train+1):
             if self.ifeatures == 1:
                 x_train[m-1,:,:,0] = self.uc[m-1]
                 x_train[m-1,:,:,1] = self.vc[m-1]
@@ -156,6 +187,10 @@ class DHIT:
                 x_train[m-1,:,:,3] = self.ucy[m-1]
                 x_train[m-1,:,:,4] = self.vcx[m-1]
                 x_train[m-1,:,:,5] = self.vcy[m-1]
+                x_train[m-1,:,:,6] = self.ucxx[m-1]
+                x_train[m-1,:,:,7] = self.ucyy[m-1]
+                x_train[m-1,:,:,8] = self.vcxx[m-1]
+                x_train[m-1,:,:,9] = self.vcyy[m-1]
             if self.ifeatures == 2:
                 x_train[m-1,:,:,0] = self.uc[m-1]
                 x_train[m-1,:,:,1] = self.vc[m-1]
@@ -172,7 +207,7 @@ class DHIT:
     def gen_test_data(self):
         
         if self.ifeatures == 1:
-            x_test  = np.zeros(shape=(1, self.nx+1, self.ny+1, 6), dtype='double')
+            x_test  = np.zeros(shape=(1, self.nx+1, self.ny+1, 10), dtype='double')
         elif self.ifeatures == 2:
             x_test  = np.zeros(shape=(1, self.nx+1, self.ny+1, 2), dtype='double')
             
@@ -181,18 +216,22 @@ class DHIT:
         elif self.ilabel == 2:
             y_test = np.zeros(shape=(1, self.nx+1, self.ny+1, 1), dtype='double')
             
-        m = (self.n_snapshots)
+        m = self.n_snapshots_test
 
         if self.ifeatures == 1:
-            x_test[m-1,:,:,0] = self.uc[m-1]
-            x_test[m-1,:,:,1] = self.vc[m-1]
-            x_test[m-1,:,:,2] = self.ucx[m-1]
-            x_test[m-1,:,:,3] = self.ucy[m-1]
-            x_test[m-1,:,:,4] = self.vcx[m-1]
-            x_test[m-1,:,:,5] = self.vcy[m-1]
+            x_test[0,:,:,0] = self.uc[m-1]
+            x_test[0,:,:,1] = self.vc[m-1]
+            x_test[0,:,:,2] = self.ucx[m-1]
+            x_test[0,:,:,3] = self.ucy[m-1]
+            x_test[0,:,:,4] = self.vcx[m-1]
+            x_test[0,:,:,5] = self.vcy[m-1]
+            x_test[0,:,:,6] = self.ucxx[m-1]
+            x_test[0,:,:,7] = self.ucyy[m-1]
+            x_test[0,:,:,8] = self.vcxx[m-1]
+            x_test[0,:,:,9] = self.vcyy[m-1]
         if self.ifeatures == 2:
-            x_test[m-1,:,:,0] = self.uc[m-1]
-            x_test[m-1,:,:,1] = self.vc[m-1]
+            x_test[0,:,:,0] = self.uc[m-1]
+            x_test[0,:,:,1] = self.vc[m-1]
         
         if self.ilabel == 1:
             y_test[0,:,:,0] = self.t11[m-1]
@@ -356,7 +395,6 @@ class CNN:
         
 #%%
 # generate training and testing data for CNN
-# generate training and testing data for CNN
 l1 = []
 with open('cnn.txt') as f:
     for l in f:
@@ -364,15 +402,17 @@ with open('cnn.txt') as f:
 
 nxf, nyf = np.int64(l1[0][0]), np.int64(l1[0][0])
 nx, ny = np.int64(l1[1][0]), np.int64(l1[1][0])
-n_snapshots = np.int64(l1[2][0])        
-freq = np.int64(l1[3][0])
-istencil = np.int64(l1[4][0])    # 1: nine point, 2: single point
-ifeatures = np.int64(l1[5][0])   # 1: 6 features, 2: 2 features 
-ilabel = np.int64(l1[6][0])      # 1: SGS (tau), 2: eddy-viscosity (nu)
+n_snapshots = np.int64(l1[2][0])
+n_snapshots_train = np.int64(l1[3][0])   
+n_snapshots_test = np.int64(l1[4][0])        
+freq = np.int64(l1[5][0])
+istencil = np.int64(l1[6][0])    # 1: nine point, 2: single point
+ifeatures = np.int64(l1[7][0])   # 1: 6 features, 2: 2 features 
+ilabel = np.int64(l1[8][0])      # 1: SGS (tau), 2: eddy-viscosity (nu)
 
 #%%
-obj = DHIT(nx=nx,ny=ny,nxf=nxf,nyf=nyf,freq=freq,n_snapshots=n_snapshots, 
-           istencil=istencil,ifeatures=ifeatures,ilabel=ilabel)
+obj = DHIT(nx=nx,ny=ny,nxf=nxf,nyf=nyf,freq=freq,n_snapshots=n_snapshots,n_snapshots_train=n_snapshots_train, 
+           n_snapshots_test=n_snapshots_test,istencil=istencil,ifeatures=ifeatures,ilabel=ilabel)
 
 max_min = obj.max_min
 
@@ -402,10 +442,10 @@ y_test = np.zeros(shape=(1, nx+1, ny+1, 3), dtype='double')
 y_pred = np.zeros(shape=(1, nx+1, ny+1, 3), dtype='double')
 
 for i in range(3):
-    y_pred[0,:,:,i] = 0.5*(y_pred_sc[0,:,:,i]*(max_min[i+6,0] - max_min[i+6,1]) + (max_min[i+6,0] + max_min[i+6,1]))
-    y_test[0,:,:,i] = 0.5*(y_test_sc[0,:,:,i]*(max_min[i+6,0] - max_min[i+6,1]) + (max_min[i+6,0] + max_min[i+6,1]))    
+    y_pred[0,:,:,i] = 0.5*(y_pred_sc[0,:,:,i]*(max_min[i+10,0] - max_min[i+10,1]) + (max_min[i+10,0] + max_min[i+10,1]))
+    y_test[0,:,:,i] = 0.5*(y_test_sc[0,:,:,i]*(max_min[i+10,0] - max_min[i+10,1]) + (max_min[i+10,0] + max_min[i+10,1]))    
 
-export_resutls(y_test[0], y_pred[0], ilabel, nxf, nx, n=1, nn = 2)
+export_resutls(y_test[0], y_pred[0], ilabel, nxf, nx, n='trial', nn = 2)
 
 #%%
 folder = "data_"+ str(nxf) + "_" + str(nx) + "_V2"
@@ -420,11 +460,11 @@ t22s = ts[2,:,:]
 folder = "data_"+ str(nxf) + "_" + str(nx) 
 m = n_snapshots*freq
 file_input = "spectral/"+folder+"/smag_shear_stress/ts_"+str(m)+".csv"
-t = np.genfromtxt(file_input, delimiter=',')
-t = t.reshape((3,nx+1,ny+1))
-t11t = t[0,:,:]
-t12t = t[1,:,:]
-t22t = t[2,:,:]
+tst = np.genfromtxt(file_input, delimiter=',')
+tst = tst.reshape((3,nx+1,ny+1))
+t11st = tst[0,:,:]
+t12st = tst[1,:,:]
+t22st = tst[2,:,:]
 
 #%%
 # histogram plot for shear stresses along with probability density function 
@@ -444,7 +484,10 @@ axs[0].hist(y_pred[0,:,:,0].flatten(), num_bins, histtype='step', alpha=1,color=
            linewidth=2.0,range=(-4*np.std(y_test[0,:,:,0]),4*np.std(y_test[0,:,:,0])),density=True,label="CNN")
 
 axs[0].hist(t11s.flatten(), num_bins, histtype='step', alpha=1,color='g',zorder=10,
-            linewidth=2.0,range=(-4*np.std(y_test[:,0]),4*np.std(y_test[:,0])),density=True,label=r"Dynamic")
+            linewidth=2.0,range=(-4*np.std(y_test[0,:,:,0]),4*np.std(y_test[0,:,:,0])),density=True,label=r"Dynamic")
+
+#axs[0].hist(t11st.flatten(), num_bins, histtype='step', alpha=1,color='k',zorder=10,
+#            linewidth=2.0,range=(-4*np.std(y_test[0,:,:,0]),4*np.std(y_test[0,:,:,0])),density=True,label=r"$C_s=0.18$")
 
 
 x_ticks = np.arange(-4*np.std(y_test[0,:,:,0]), 4.1*np.std(y_test[0,:,:,0]), np.std(y_test[0,:,:,0]))                                  
@@ -464,6 +507,9 @@ axs[1].hist(y_pred[0,:,:,1].flatten(), num_bins, histtype='step', alpha=1,color=
 axs[1].hist(t12s.flatten(), num_bins, histtype='step', alpha=1,color='g',zorder=10,
             linewidth=2.0,range=(-4*np.std(y_test[0,:,:,1]),4*np.std(y_test[0,:,:,1])),density=True,label=r"Dynamic")
 
+#axs[1].hist(t12st.flatten(), num_bins, histtype='step', alpha=1,color='k',zorder=10,
+#            linewidth=2.0,range=(-4*np.std(y_test[0,:,:,1]),4*np.std(y_test[0,:,:,1])),density=True,label=r"$C_s=0.18$")
+
 x_ticks = np.arange(-4*np.std(y_test[0,:,:,1]), 4.1*np.std(y_test[0,:,:,1]), np.std(y_test[0,:,:,1]))                                  
 x_labels = [r"${} \sigma$".format(i) for i in range(-4,5)]
 axs[1].set_title(r"$\tau_{12}$")
@@ -481,6 +527,9 @@ axs[2].hist(y_pred[0,:,:,2].flatten(), num_bins, histtype='step', alpha=1,color=
 axs[2].hist(t22s.flatten(), num_bins, histtype='step', alpha=1,color='g',zorder=10,
             linewidth=2.0,range=(-4*np.std(y_test[0,:,:,2]),4*np.std(y_test[0,:,:,2])),density=True,label=r"Dynamic")
 
+#axs[2].hist(t22st.flatten(), num_bins, histtype='step', alpha=1,color='k',zorder=10,
+#            linewidth=2.0,range=(-4*np.std(y_test[0,:,:,2]),4*np.std(y_test[0,:,:,2])),density=True,label=r"$C_s=0.18$")
+
 x_ticks = np.arange(-4*np.std(y_test[0,:,:,2]), 4.1*np.std(y_test[0,:,:,2]), np.std(y_test[0,:,:,2]))                                  
 x_labels = [r"${} \sigma$".format(i) for i in range(-4,5)]
 axs[2].set_title(r"$\tau_{22}$")
@@ -491,7 +540,7 @@ axs[2].legend()
 fig.tight_layout()
 plt.show()
 
-fig.savefig("ts_cnn1.pdf", bbox_inches = 'tight')
+fig.savefig("ts_cnn2.pdf", bbox_inches = 'tight')
 
 #%%
 # contour plot of shear stresses

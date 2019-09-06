@@ -295,7 +295,7 @@ def grad_spectral(nx,ny,u):
             
 
 #%%
-def write_data(uc,vc,uuc,uvc,vvc,ucx,ucy,vcx,vcy,S,t,t_s,C,nu_s,nu_t):
+def write_data(uc,vc,uuc,uvc,vvc,ucx,ucy,vcx,vcy,ucxx,ucyy,vcxx,vcyy,S,t,t_s,C,nu_s,nu_t):
     
     folder = "data_"+ str(nx) + "_" + str(nxc) + "_V2"
     if not os.path.exists("spectral/"+folder+"/uc"):
@@ -313,6 +313,10 @@ def write_data(uc,vc,uuc,uvc,vvc,ucx,ucy,vcx,vcy,S,t,t_s,C,nu_s,nu_t):
         os.makedirs("spectral/"+folder+"/ucy")
         os.makedirs("spectral/"+folder+"/vcx")
         os.makedirs("spectral/"+folder+"/vcy")
+        os.makedirs("spectral/"+folder+"/ucxx")
+        os.makedirs("spectral/"+folder+"/ucyy")
+        os.makedirs("spectral/"+folder+"/vcxx")
+        os.makedirs("spectral/"+folder+"/vcyy")
         os.makedirs("spectral/"+folder+"/Sc")
         os.makedirs("spectral/"+folder+"/cs2")
         os.makedirs("spectral/"+folder+"/gp/ucx")
@@ -349,6 +353,14 @@ def write_data(uc,vc,uuc,uvc,vvc,ucx,ucy,vcx,vcy,S,t,t_s,C,nu_s,nu_t):
     np.savetxt(filename, vcx, delimiter=",")
     filename = "spectral/"+folder+"/vcy/vcy_"+str(int(n))+".csv"
     np.savetxt(filename, vcy, delimiter=",")
+    filename = "spectral/"+folder+"/ucxx/ucxx_"+str(int(n))+".csv"
+    np.savetxt(filename, ucxx, delimiter=",")
+    filename = "spectral/"+folder+"/ucyy/ucyy_"+str(int(n))+".csv"
+    np.savetxt(filename, ucyy, delimiter=",")
+    filename = "spectral/"+folder+"/vcxx/vcxx_"+str(int(n))+".csv"
+    np.savetxt(filename, vcxx, delimiter=",")
+    filename = "spectral/"+folder+"/vcyy/vcyy_"+str(int(n))+".csv"
+    np.savetxt(filename, vcyy, delimiter=",")
     filename = "spectral/"+folder+"/Sc/Sc_"+str(int(n))+".csv"
     np.savetxt(filename, S, delimiter=",")
     
@@ -527,9 +539,9 @@ def compute_cs_smag(dxc,dyc,nxc,nyc,uc,vc,dac,d11c,d12c,d22c,ics,ifltr,alpha):
     l12 = uvcc - ucc*vcc
     l22 = vvcc - vcc*vcc
     
-    l11d = l11 #- 0.5*(l11 + l22)
+    l11d = l11 - 0.5*(l11 + l22)
     l12d = l12
-    l22d = l22 #- 0.5*(l11 + l22)
+    l22d = l22 - 0.5*(l11 + l22)
     
     m11 = delta**2*(h11cc-alpha**2*dacc*d11cc)
     m12 = delta**2*(h12cc-alpha**2*dacc*d12cc)
@@ -645,14 +657,20 @@ def compute_stress_smag(nx,ny,nxc,nyc,dxc,dyc,u,v,n,ist,ics,ifltr,alpha):
     elif ist == 5:
         print(n)        
         
-#        t11_b,t12_b,t22_b = bardina_stres1(nx,ny,nxc,nyc,u,v)
         t11_b,t12_b,t22_b = bardina_stres2(nxc,nyc,uc,vc)
                
         t_s[0,:,:] = t11_b - 0.5*(t11_b+t22_b)
         t_s[1,:,:] = t12_b
         t_s[2,:,:] = t22_b - 0.5*(t11_b+t22_b)
-        
-    write_data(uc,vc,uuc,uvc,vvc,ucx,ucy,vcx,vcy,da,t,t_s,CS2,nu_s,nu_t)
+    
+    # compute second-order derivative
+    
+    ucxx,ucxy = grad_spectral(nxc,nyc,ucx)
+    ucyx,ucyy = grad_spectral(nxc,nyc,ucy) 
+    vcxx,vcxy = grad_spectral(nxc,nyc,vcx)
+    vcyx,vcyy = grad_spectral(nxc,nyc,vcy) 
+
+    write_data(uc,vc,uuc,uvc,vvc,ucx,ucy,vcx,vcy,ucxx,ucyy,vcxx,vcyy,da,t,t_s,CS2,nu_s,nu_t)
     
 #%%
 def compute_cs_leith(dxc,dyc,nxc,nyc,uc,vc,Wc,d11c,d12c,d22c,ics,ifltr,alpha):
@@ -1391,7 +1409,7 @@ ntrue, binst, patchest = axs[0].hist(t11t.flatten(), num_bins, histtype='step', 
                                  linewidth=2.0,range=(-4*np.std(t11t),4*np.std(t11t)),density=True,
                                  label="True")
 ntrue, binst, patchest = axs[0].hist(t11sm_s.flatten(), num_bins, histtype='step', alpha=1, color='b',zorder=5,
-                                 linewidth=2.0,range=(-4*np.std(t11sm_s),4*np.std(t11sm_s)),density=True,
+                                 linewidth=2.0,range=(-4*np.std(t11t),4*np.std(t11t)),density=True,
                                  label="Static")
 
 
