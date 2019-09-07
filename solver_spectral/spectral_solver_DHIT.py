@@ -583,23 +583,23 @@ def write_data(nx,ny,dx,dy,kx,ky,k2,nxc,nyc,dxc,dyc,wf,w0,n,freq,dt):
     sgs = jc - jcoarse
     
     folder = 'data_'+str(nx)
-    if not os.path.exists("spectral/"+folder):
-        os.makedirs("spectral/"+folder)
-        os.makedirs("spectral/"+folder+"/01_coarsened_jacobian_field")
-        os.makedirs("spectral/"+folder+"/02_jacobian_coarsened_field")
-        os.makedirs("spectral/"+folder+"/03_subgrid_scale_term")
-        os.makedirs("spectral/"+folder+"/04_vorticity")
-        os.makedirs("spectral/"+folder+"/05_streamfunction")
+    if not os.path.exists("../data_spectral/"+folder):
+        os.makedirs("../data_spectral/"+folder)
+        os.makedirs("../data_spectral/"+folder+"/01_coarsened_jacobian_field")
+        os.makedirs("../data_spectral/"+folder+"/02_jacobian_coarsened_field")
+        os.makedirs("../data_spectral/"+folder+"/03_subgrid_scale_term")
+        os.makedirs("../data_spectral/"+folder+"/04_vorticity")
+        os.makedirs("../data_spectral/"+folder+"/05_streamfunction")
     
-    filename = "spectral/"+folder+"/01_coarsened_jacobian_field/J_fourier_"+str(int(n/freq))+".csv"
+    filename = "../data_spectral/"+folder+"/01_coarsened_jacobian_field/J_fourier_"+str(int(n/freq))+".csv"
     np.savetxt(filename, jc, delimiter=",")    
-    filename = "spectral/"+folder+"/02_jacobian_coarsened_field/J_coarsen_"+str(int(n/freq))+".csv"
+    filename = "../data_spectral/"+folder+"/02_jacobian_coarsened_field/J_coarsen_"+str(int(n/freq))+".csv"
     np.savetxt(filename, jcoarse, delimiter=",")
-    filename = "spectral/"+folder+"/03_subgrid_scale_term/sgs_"+str(int(n/freq))+".csv"
+    filename = "../data_spectral/"+folder+"/03_subgrid_scale_term/sgs_"+str(int(n/freq))+".csv"
     np.savetxt(filename, sgs, delimiter=",")
-    filename = "spectral/"+folder+"/04_vorticity/w_"+str(int(n/freq))+".csv"
+    filename = "../data_spectral/"+folder+"/04_vorticity/w_"+str(int(n/freq))+".csv"
     np.savetxt(filename, w, delimiter=",")
-    filename = "spectral/"+folder+"/05_streamfunction/s_"+str(int(n/freq))+".csv"
+    filename = "../data_spectral/"+folder+"/05_streamfunction/s_"+str(int(n/freq))+".csv"
     np.savetxt(filename, s, delimiter=",")
     
     if n%(50*freq) == 0:
@@ -617,7 +617,7 @@ def write_data(nx,ny,dx,dy,kx,ky,k2,nxc,nyc,dxc,dyc,wf,w0,n,freq,dt):
         cbar_ax = fig.add_axes([0.22, -0.05, 0.6, 0.04])
         fig.colorbar(cs, cax=cbar_ax, orientation='horizontal')
             
-        filename = "spectral/"+folder+"/field_spectral_"+str(int(n/freq))+".png"
+        filename = "../data_spectral/"+folder+"/field_spectral_"+str(int(n/freq))+".png"
         fig.savefig(filename, bbox_inches = 'tight')
     
     
@@ -681,7 +681,7 @@ if ichkp == 0:
     w = np.copy(w0)
 elif ichkp == 1:
     print(istart)
-    file_input = "spectral/"+folder+"/04_vorticity/w_"+str(istart)+".csv"
+    file_input = "../data_spectral/"+folder+"/04_vorticity/w_"+str(istart)+".csv"
     w = np.genfromtxt(file_input, delimiter=',')
     
 #%%
@@ -761,7 +761,9 @@ if (ipr == 3):
     c = 4.0/(3.0*np.sqrt(np.pi)*(k0**5))           
     ese = c*(k**4)*np.exp(-(k/k0)**2)
     
-    np.savetxt("spectral/energy_spectral_"+str(nd)+"_"+str(int(re))+".csv", en, delimiter=",")
+    folder = 'data_'+str(nx)
+    
+    np.savetxt("../data_spectral/"+folder+"energy_spectral_"+str(nd)+"_"+str(int(re))+".csv", en, delimiter=",")
 
 #%%
 # contour plot for initial and final vorticity

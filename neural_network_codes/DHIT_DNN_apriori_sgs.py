@@ -72,54 +72,54 @@ class DHIT:
         for m in range(1,self.n_snapshots+1):
             folder = "data_"+ str(self.nxf) + "_" + str(self.nx) 
             
-            file_input = "../spectral/"+folder+"/uc/uc_"+str(self.freq*m)+".csv"
+            file_input = "../data_spectral/"+folder+"/uc/uc_"+str(self.freq*m)+".csv"
             data_input = np.genfromtxt(file_input, delimiter=',')
             self.uc[m-1,:,:] = data_input
             
-            file_input = "../spectral/"+folder+"/vc/vc_"+str(self.freq*m)+".csv"
+            file_input = "../data_spectral/"+folder+"/vc/vc_"+str(self.freq*m)+".csv"
             data_input = np.genfromtxt(file_input, delimiter=',')
             self.vc[m-1,:,:] = data_input
             
-            file_input = "../spectral/"+folder+"/ucx/ucx_"+str(self.freq*m)+".csv"
+            file_input = "../data_spectral/"+folder+"/ucx/ucx_"+str(self.freq*m)+".csv"
             data_input = np.genfromtxt(file_input, delimiter=',')
             self.ucx[m-1,:,:] = data_input
             
-            file_input = "../spectral/"+folder+"/ucy/ucy_"+str(self.freq*m)+".csv"
+            file_input = "../data_spectral/"+folder+"/ucy/ucy_"+str(self.freq*m)+".csv"
             data_input = np.genfromtxt(file_input, delimiter=',')
             self.ucy[m-1,:,:] = data_input
             
-            file_input = "../spectral/"+folder+"/vcx/vcx_"+str(self.freq*m)+".csv"
+            file_input = "../data_spectral/"+folder+"/vcx/vcx_"+str(self.freq*m)+".csv"
             data_input = np.genfromtxt(file_input, delimiter=',')
             self.vcx[m-1,:,:] = data_input
             
-            file_input = "../spectral/"+folder+"/vcy/vcy_"+str(self.freq*m)+".csv"
+            file_input = "../data_spectral/"+folder+"/vcy/vcy_"+str(self.freq*m)+".csv"
             data_input = np.genfromtxt(file_input, delimiter=',')
             self.vcy[m-1,:,:] = data_input
             
-            file_input = "../spectral/"+folder+"/ucxx/ucxx_"+str(self.freq*m)+".csv"
+            file_input = "../data_spectral/"+folder+"/ucxx/ucxx_"+str(self.freq*m)+".csv"
             data_input = np.genfromtxt(file_input, delimiter=',')
             self.ucxx[m-1,:,:] = data_input
             
-            file_input = "../spectral/"+folder+"/ucyy/ucyy_"+str(self.freq*m)+".csv"
+            file_input = "../data_spectral/"+folder+"/ucyy/ucyy_"+str(self.freq*m)+".csv"
             data_input = np.genfromtxt(file_input, delimiter=',')
             self.ucyy[m-1,:,:] = data_input
             
-            file_input = "../spectral/"+folder+"/vcxx/vcxx_"+str(self.freq*m)+".csv"
+            file_input = "../data_spectral/"+folder+"/vcxx/vcxx_"+str(self.freq*m)+".csv"
             data_input = np.genfromtxt(file_input, delimiter=',')
             self.vcxx[m-1,:,:] = data_input
             
-            file_input = "../spectral/"+folder+"/vcyy/vcyy_"+str(self.freq*m)+".csv"
+            file_input = "../data_spectral/"+folder+"/vcyy/vcyy_"+str(self.freq*m)+".csv"
             data_input = np.genfromtxt(file_input, delimiter=',')
             self.vcyy[m-1,:,:] = data_input
             
-            file_output = "../spectral/"+folder+"/true_shear_stress/t_"+str(self.freq*m)+".csv"
+            file_output = "../data_spectral/"+folder+"/true_shear_stress/t_"+str(self.freq*m)+".csv"
             data_output = np.genfromtxt(file_output, delimiter=',')
             data_output = data_output.reshape((3,self.nx+1,self.ny+1))
             self.t11[m-1,:,:] = data_output[0,:,:]
             self.t12[m-1,:,:] = data_output[1,:,:]
             self.t22[m-1,:,:] = data_output[2,:,:]
             
-            file_input = "../spectral/"+folder+"/nu_smag/nus_"+str(self.freq*m)+".csv"
+            file_input = "../data_spectral/"+folder+"/nu_smag/nus_"+str(self.freq*m)+".csv"
             data_input = np.genfromtxt(file_input, delimiter=',')
             self.nu[m-1,:,:] = data_input
             
@@ -531,7 +531,7 @@ export_resutls(y_test, y_pred, ilabel, nxf, nx, n='trial', nn = 1)
 #%%
 folder = "data_"+ str(nxf) + "_" + str(nx) 
 m = n_snapshots*freq
-file_input = "../spectral/"+folder+"/smag_shear_stress/ts_"+str(m)+".csv"
+file_input = "../data_spectral/"+folder+"/smag_shear_stress/ts_"+str(m)+".csv"
 ts = np.genfromtxt(file_input, delimiter=',')
 ts = ts.reshape((3,nx+1,ny+1))
 t11s = ts[0,:,:]

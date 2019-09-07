@@ -297,121 +297,121 @@ def grad_spectral(nx,ny,u):
 #%%
 def write_data(uc,vc,uuc,uvc,vvc,ucx,ucy,vcx,vcy,ucxx,ucyy,vcxx,vcyy,S,t,t_s,C,nu_s,nu_t):
     
-    folder = "data_"+ str(nx) + "_" + str(nxc) + "_V2"
-    if not os.path.exists("spectral/"+folder+"/uc"):
-        os.makedirs("spectral/"+folder+"/uc")
-        os.makedirs("spectral/"+folder+"/vc")
-        os.makedirs("spectral/"+folder+"/uuc")
-        os.makedirs("spectral/"+folder+"/uvc")
-        os.makedirs("spectral/"+folder+"/vvc")
-        os.makedirs("spectral/"+folder+"/true_shear_stress")
-        os.makedirs("spectral/"+folder+"/smag_shear_stress")
-        os.makedirs("spectral/"+folder+"/coefficient")
-        os.makedirs("spectral/"+folder+"/nu_smag")
-        os.makedirs("spectral/"+folder+"/nu_true")
-        os.makedirs("spectral/"+folder+"/ucx")
-        os.makedirs("spectral/"+folder+"/ucy")
-        os.makedirs("spectral/"+folder+"/vcx")
-        os.makedirs("spectral/"+folder+"/vcy")
-        os.makedirs("spectral/"+folder+"/ucxx")
-        os.makedirs("spectral/"+folder+"/ucyy")
-        os.makedirs("spectral/"+folder+"/vcxx")
-        os.makedirs("spectral/"+folder+"/vcyy")
-        os.makedirs("spectral/"+folder+"/Sc")
-        os.makedirs("spectral/"+folder+"/cs2")
-        os.makedirs("spectral/"+folder+"/gp/ucx")
-        os.makedirs("spectral/"+folder+"/gp/ucy")
-        os.makedirs("spectral/"+folder+"/gp/vcx")
-        os.makedirs("spectral/"+folder+"/gp/vcy")
-        os.makedirs("spectral/"+folder+"/gp/Sc")
-        os.makedirs("spectral/"+folder+"/gp/true")
-        os.makedirs("spectral/"+folder+"/gp/smag")
+    folder = "data_"+ str(nx) + "_" + str(nxc) 
+    if not os.path.exists("../data_spectral/"+folder+"/uc"):
+        os.makedirs("../data_spectral/"+folder+"/uc")
+        os.makedirs("../data_spectral/"+folder+"/vc")
+        os.makedirs("../data_spectral/"+folder+"/uuc")
+        os.makedirs("../data_spectral/"+folder+"/uvc")
+        os.makedirs("../data_spectral/"+folder+"/vvc")
+        os.makedirs("../data_spectral/"+folder+"/true_shear_stress")
+        os.makedirs("../data_spectral/"+folder+"/smag_shear_stress")
+        os.makedirs("../data_spectral/"+folder+"/coefficient")
+        os.makedirs("../data_spectral/"+folder+"/nu_smag")
+        os.makedirs("../data_spectral/"+folder+"/nu_true")
+        os.makedirs("../data_spectral/"+folder+"/ucx")
+        os.makedirs("../data_spectral/"+folder+"/ucy")
+        os.makedirs("../data_spectral/"+folder+"/vcx")
+        os.makedirs("../data_spectral/"+folder+"/vcy")
+        os.makedirs("../data_spectral/"+folder+"/ucxx")
+        os.makedirs("../data_spectral/"+folder+"/ucyy")
+        os.makedirs("../data_spectral/"+folder+"/vcxx")
+        os.makedirs("../data_spectral/"+folder+"/vcyy")
+        os.makedirs("../data_spectral/"+folder+"/Sc")
+        os.makedirs("../data_spectral/"+folder+"/cs2")
+        os.makedirs("../data_spectral/"+folder+"/gp/ucx")
+        os.makedirs("../data_spectral/"+folder+"/gp/ucy")
+        os.makedirs("../data_spectral/"+folder+"/gp/vcx")
+        os.makedirs("../data_spectral/"+folder+"/gp/vcy")
+        os.makedirs("../data_spectral/"+folder+"/gp/Sc")
+        os.makedirs("../data_spectral/"+folder+"/gp/true")
+        os.makedirs("../data_spectral/"+folder+"/gp/smag")
         
-        with open("spectral/"+folder+"/cs2/cs2.csv", 'a') as csvFile:
+        with open("../data_spectral/"+folder+"/cs2/cs2.csv", 'a') as csvFile:
             writer = csv.writer(csvFile)
             writer.writerow(['n', 'CS2'])
         
-    filename = "spectral/"+folder+"/uc/uc_"+str(int(n))+".csv"
+    filename = "../data_spectral/"+folder+"/uc/uc_"+str(int(n))+".csv"
     np.savetxt(filename, uc, delimiter=",")
-    filename = "spectral/"+folder+"/vc/vc_"+str(int(n))+".csv"
+    filename = "../data_spectral/"+folder+"/vc/vc_"+str(int(n))+".csv"
     np.savetxt(filename, vc, delimiter=",")
-    filename = "spectral/"+folder+"/uuc/uuc_"+str(int(n))+".csv"
+    filename = "../data_spectral/"+folder+"/uuc/uuc_"+str(int(n))+".csv"
     np.savetxt(filename, uuc, delimiter=",")
-    filename = "spectral/"+folder+"/uvc/uvc_"+str(int(n))+".csv"
+    filename = "../data_spectral/"+folder+"/uvc/uvc_"+str(int(n))+".csv"
     np.savetxt(filename, uvc, delimiter=",")
-    filename = "spectral/"+folder+"/vvc/vvc_"+str(int(n))+".csv"
+    filename = "../data_spectral/"+folder+"/vvc/vvc_"+str(int(n))+".csv"
     np.savetxt(filename, vvc, delimiter=",")
-    filename = "spectral/"+folder+"/coefficient/c_"+str(int(n))+".csv"
+    filename = "../data_spectral/"+folder+"/coefficient/c_"+str(int(n))+".csv"
     np.savetxt(filename, C, delimiter=",")
-    filename = "spectral/"+folder+"/nu_smag/nus_"+str(int(n))+".csv"
+    filename = "../data_spectral/"+folder+"/nu_smag/nus_"+str(int(n))+".csv"
     np.savetxt(filename, nu_s, delimiter=",")
-    filename = "spectral/"+folder+"/ucx/ucx_"+str(int(n))+".csv"
+    filename = "../data_spectral/"+folder+"/ucx/ucx_"+str(int(n))+".csv"
     np.savetxt(filename, ucx, delimiter=",")
-    filename = "spectral/"+folder+"/ucy/ucy_"+str(int(n))+".csv"
+    filename = "../data_spectral/"+folder+"/ucy/ucy_"+str(int(n))+".csv"
     np.savetxt(filename, ucy, delimiter=",")
-    filename = "spectral/"+folder+"/vcx/vcx_"+str(int(n))+".csv"
+    filename = "../data_spectral/"+folder+"/vcx/vcx_"+str(int(n))+".csv"
     np.savetxt(filename, vcx, delimiter=",")
-    filename = "spectral/"+folder+"/vcy/vcy_"+str(int(n))+".csv"
+    filename = "../data_spectral/"+folder+"/vcy/vcy_"+str(int(n))+".csv"
     np.savetxt(filename, vcy, delimiter=",")
-    filename = "spectral/"+folder+"/ucxx/ucxx_"+str(int(n))+".csv"
+    filename = "../data_spectral/"+folder+"/ucxx/ucxx_"+str(int(n))+".csv"
     np.savetxt(filename, ucxx, delimiter=",")
-    filename = "spectral/"+folder+"/ucyy/ucyy_"+str(int(n))+".csv"
+    filename = "../data_spectral/"+folder+"/ucyy/ucyy_"+str(int(n))+".csv"
     np.savetxt(filename, ucyy, delimiter=",")
-    filename = "spectral/"+folder+"/vcxx/vcxx_"+str(int(n))+".csv"
+    filename = "../data_spectral/"+folder+"/vcxx/vcxx_"+str(int(n))+".csv"
     np.savetxt(filename, vcxx, delimiter=",")
-    filename = "spectral/"+folder+"/vcyy/vcyy_"+str(int(n))+".csv"
+    filename = "../data_spectral/"+folder+"/vcyy/vcyy_"+str(int(n))+".csv"
     np.savetxt(filename, vcyy, delimiter=",")
-    filename = "spectral/"+folder+"/Sc/Sc_"+str(int(n))+".csv"
+    filename = "../data_spectral/"+folder+"/Sc/Sc_"+str(int(n))+".csv"
     np.savetxt(filename, S, delimiter=",")
     
-    with open("spectral/"+folder+"/cs2/cs2.csv", 'a') as csvFile:
+    with open("../data_spectral/"+folder+"/cs2/cs2.csv", 'a') as csvFile:
             writer = csv.writer(csvFile)
             writer.writerow([str(n), str(np.mean(C))])
         
-    with open("spectral/"+folder+"/true_shear_stress/t_"+str(int(n))+".csv", 'w') as outfile:
+    with open("../data_spectral/"+folder+"/true_shear_stress/t_"+str(int(n))+".csv", 'w') as outfile:
         outfile.write('# Array shape: {0}\n'.format(t.shape))
         for data_slice in t:
             np.savetxt(outfile, data_slice, delimiter=",")
             outfile.write('# New slice\n')
     
-    with open("spectral/"+folder+"/smag_shear_stress/ts_"+str(int(n))+".csv", 'w') as outfile:
+    with open("../data_spectral/"+folder+"/smag_shear_stress/ts_"+str(int(n))+".csv", 'w') as outfile:
         outfile.write('# Array shape: {0}\n'.format(t_s.shape))
         for data_slice in t_s:
             np.savetxt(outfile, data_slice, delimiter=",")
             outfile.write('# New slice\n')
     
-    with open("spectral/"+folder+"/nu_true/nut_"+str(int(n))+".csv", 'w') as outfile:
+    with open("../data_spectral/"+folder+"/nu_true/nut_"+str(int(n))+".csv", 'w') as outfile:
         outfile.write('# Array shape: {0}\n'.format(nu_t.shape))
         for data_slice in nu_t:
             np.savetxt(outfile, data_slice, delimiter=",")
             outfile.write('# New slice\n')
                           
-    filename = "spectral/"+folder+"/gp/ucx/ucx_"+str(int(n))+".npy"
+    filename = "../data_spectral/"+folder+"/gp/ucx/ucx_"+str(int(n))+".npy"
     np.save(filename, ucx)
-    filename = "spectral/"+folder+"/gp/ucy/ucy_"+str(int(n))+".npy"
+    filename = "../data_spectral/"+folder+"/gp/ucy/ucy_"+str(int(n))+".npy"
     np.save(filename, ucy)
-    filename = "spectral/"+folder+"/gp/vcx/vcx_"+str(int(n))+".npy"
+    filename = "../data_spectral/"+folder+"/gp/vcx/vcx_"+str(int(n))+".npy"
     np.save(filename, vcx)
-    filename = "spectral/"+folder+"/gp/vcy/vcy_"+str(int(n))+".npy"
+    filename = "../data_spectral/"+folder+"/gp/vcy/vcy_"+str(int(n))+".npy"
     np.save(filename, vcy)
-    filename = "spectral/"+folder+"/gp/Sc/Sc_"+str(int(n))+".npy"
+    filename = "../data_spectral/"+folder+"/gp/Sc/Sc_"+str(int(n))+".npy"
     np.save(filename, S)
-    filename = "spectral/"+folder+"/gp/true/t_"+str(int(n))+".npy"
+    filename = "../data_spectral/"+folder+"/gp/true/t_"+str(int(n))+".npy"
     np.save(filename, t.reshape(int(3*(nxc+1)),int(nyc+1)))
-    filename = "spectral/"+folder+"/gp/smag/ts_"+str(int(n))+".npy"
+    filename = "../data_spectral/"+folder+"/gp/smag/ts_"+str(int(n))+".npy"
     np.save(filename, t_s.reshape(int(3*(nxc+1)),int(nyc+1)))
 
 #%%
 def write_data_dyn(L,M):
     
-    folder = "data_"+ str(nx) + "_" + str(nxc) + "_V2"
-    if not os.path.exists("spectral/"+folder+"/L"):
-        os.makedirs("spectral/"+folder+"/L")
-        os.makedirs("spectral/"+folder+"/M")   
+    folder = "data_"+ str(nx) + "_" + str(nxc) 
+    if not os.path.exists("../data_spectral/"+folder+"/L"):
+        os.makedirs("../data_spectral/"+folder+"/L")
+        os.makedirs("../data_spectral/"+folder+"/M")   
     
-    filename = "spectral/"+folder+"/L/L_"+str(int(n))+".csv"
+    filename = "../data_spectral/"+folder+"/L/L_"+str(int(n))+".csv"
     np.savetxt(filename, L, delimiter=",")
-    filename = "spectral/"+folder+"/M/M_"+str(int(n))+".csv"
+    filename = "../data_spectral/"+folder+"/M/M_"+str(int(n))+".csv"
     np.savetxt(filename, M, delimiter=",")
     
     
@@ -1358,22 +1358,22 @@ dyc = ly/np.float64(nyc)
 #%%
 for n in range(1,ns+1):
     folder = "data_"+str(nx)
-    file_input = "spectral/"+folder+"/05_streamfunction/s_"+str(n)+".csv"
+    file_input = "../data_spectral/"+folder+"/05_streamfunction/s_"+str(n)+".csv"
     s = np.genfromtxt(file_input, delimiter=',')
-    file_input = "spectral/"+folder+"/04_vorticity/w_"+str(n)+".csv"
+    file_input = "../data_spectral/"+folder+"/04_vorticity/w_"+str(n)+".csv"
     w = np.genfromtxt(file_input, delimiter=',') 
     
     wc = coarsen(nx,ny,nxc,nyc,w)
     sc = coarsen(nx,ny,nxc,nyc,s)
     
-    folder = "data_" + str(nx) + "_" + str(nxc) + "_V2"
-    if not os.path.exists("spectral/"+folder+"/00_wc"):
-        os.makedirs("spectral/"+folder+"/00_wc")
-        os.makedirs("spectral/"+folder+"/00_sc")
+    folder = "data_" + str(nx) + "_" + str(nxc) 
+    if not os.path.exists("../data_spectral/"+folder+"/00_wc"):
+        os.makedirs("../data_spectral/"+folder+"/00_wc")
+        os.makedirs("../data_spectral/"+folder+"/00_sc")
     
-    filename = "spectral/"+folder+"/00_wc/wc_"+str(int(n))+".csv"
+    filename = "../data_spectral/"+folder+"/00_wc/wc_"+str(int(n))+".csv"
     np.savetxt(filename, wc, delimiter=",")
-    filename = "spectral/"+folder+"/00_sc/sc_"+str(int(n))+".csv"
+    filename = "../data_spectral/"+folder+"/00_sc/sc_"+str(int(n))+".csv"
     np.savetxt(filename, sc, delimiter=",")
     
     #u,v = compute_velocity(nx,ny,dx,dy,s)
@@ -1384,14 +1384,14 @@ for n in range(1,ns+1):
 
 
 #%%
-folder = "data_" + str(nx) + "_" + str(nxc) + "_V2"
-tt = np.genfromtxt("spectral/"+folder+"/true_shear_stress/t_"+str(ns)+".csv", delimiter=',') 
+folder = "data_" + str(nx) + "_" + str(nxc) 
+tt = np.genfromtxt("../data_spectral/"+folder+"/true_shear_stress/t_"+str(ns)+".csv", delimiter=',') 
 tt = tt.reshape((3,nxc+1,nyc+1))
 t11t = tt[0,:,:]
 t12t = tt[1,:,:]
 t22t = tt[2,:,:]
 
-ts = np.genfromtxt("spectral/"+folder+"/smag_shear_stress/ts_"+str(ns)+".csv", delimiter=',') 
+ts = np.genfromtxt("../data_spectral/"+folder+"/smag_shear_stress/ts_"+str(ns)+".csv", delimiter=',') 
 ts = ts.reshape((3,nxc+1,nyc+1))
 t11sm_s = ts[0,:,:]
 t12sm_s = ts[1,:,:]

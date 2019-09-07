@@ -31,13 +31,13 @@ def export_resutls(y_test, y_pred, ilabel, nxf, nx, n, nn):
     
     folder = "data_"+ str(nxf) + "_" + str(nx) 
     
-    if not os.path.exists("../spectral/"+folder+"/01_ML_DNN"):
-        os.makedirs("../spectral/"+folder+"/01_ML_DNN")
-        os.makedirs("../spectral/"+folder+"/01_ML_DNN/test_data_labels")
-        os.makedirs("../spectral/"+folder+"/01_ML_DNN/pred_data_labels")
-        os.makedirs("../spectral/"+folder+"/01_ML_CNN")
-        os.makedirs("../spectral/"+folder+"/01_ML_CNN/test_data_labels")
-        os.makedirs("../spectral/"+folder+"/01_ML_CNN/pred_data_labels")
+    if not os.path.exists("../data_spectral/"+folder+"/01_ML_DNN"):
+        os.makedirs("../data_spectral/"+folder+"/01_ML_DNN")
+        os.makedirs("../data_spectral/"+folder+"/01_ML_DNN/test_data_labels")
+        os.makedirs("../data_spectral/"+folder+"/01_ML_DNN/pred_data_labels")
+        os.makedirs("../data_spectral/"+folder+"/01_ML_CNN")
+        os.makedirs("../data_spectral/"+folder+"/01_ML_CNN/test_data_labels")
+        os.makedirs("../data_spectral/"+folder+"/01_ML_CNN/pred_data_labels")
         
     if nn == 1:
         folder = "data_"+ str(nxf) + "_" + str(nx) + "/01_ML_DNN"
@@ -45,30 +45,30 @@ def export_resutls(y_test, y_pred, ilabel, nxf, nx, n, nn):
         folder = "data_"+ str(nxf) + "_" + str(nx) + "/01_ML_CNN"
         
     if ilabel == 1:
-        with open("../spectral/"+folder+"/test_data_labels/y_test_sgs_"+str((n))+".csv", 'w') as outfile:
+        with open("../data_spectral/"+folder+"/test_data_labels/y_test_sgs_"+str((n))+".csv", 'w') as outfile:
             outfile.write('# Array shape: {0}\n'.format(y_test.shape))
             for data_slice in y_test:
                 np.savetxt(outfile, data_slice, delimiter=",")
                 outfile.write('# New slice\n')
         
-        with open("../spectral/"+folder+"/pred_data_labels/y_pred_sgs_"+str((n))+".csv", 'w') as outfile:
+        with open("../data_spectral/"+folder+"/pred_data_labels/y_pred_sgs_"+str((n))+".csv", 'w') as outfile:
             outfile.write('# Array shape: {0}\n'.format(y_pred.shape))
             for data_slice in y_pred:
                 np.savetxt(outfile, data_slice, delimiter=",")
                 outfile.write('# New slice\n')
     
     if ilabel == 2:
-        filename = "../spectral/"+folder+"/test_data_labels/y_test_nu_"+str((n))+".csv"
+        filename = "../data_spectral/"+folder+"/test_data_labels/y_test_nu_"+str((n))+".csv"
         np.savetxt(filename, y_test, delimiter=",")
         
-        filename = "../spectral/"+folder+"/pred_data_labels/y_pred_nu_"+str((n))+".csv"
+        filename = "../data_spectral/"+folder+"/pred_data_labels/y_pred_nu_"+str((n))+".csv"
         np.savetxt(filename, y_pred, delimiter=",")
         
 #%%
 def plot_dynamic_cs2(nxf, nx):
-    folder = "data_"+ str(nxf) + "_" + str(nx) + "_V2"
+    folder = "data_"+ str(nxf) + "_" + str(nx) 
             
-    file_input = "../spectral/"+folder+"/cs2/cs2.csv"
+    file_input = "../data_spectral/"+folder+"/cs2/cs2.csv"
     data_input = np.genfromtxt(file_input, delimiter=',',skip_header=1)
     t = data_input[:,0]
     cs2 = data_input[:,2]
