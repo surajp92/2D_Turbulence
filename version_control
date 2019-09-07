@@ -1,0 +1,7 @@
+Version control:
+spectral_dhit: version 1
+spectral_dhit_v2: Jacobian calculation corrected (wrong), original version is correct
+spectral_dhit_v3: using np.fft2,
+spectral_apriori: version 1
+spectral_apriori_v2: # of filters made consistent, 
+spectral_apriori_v2: streamfunction-vorticity formulaion added (wrong)
