@@ -1,9 +1,9 @@
 1024		!NXF=NYF; fine resolution
 64		!NX=NY; coarse resolution
 400		!N; number of snapshots
-350		!Ntr: training snapshots
+120		!Ntr: training snapshots
 400		!Nte; test snapshot
-1		!f; frequency
+3		!f; frequency
 1		!istencil; 1: global, 
 10		!ifeatures; 2: 2 features, 6: 6 features, 10: 10 features,  
 1		!ilabel; 1: SGS (tau), 2: eddy-viscosity (nu)
