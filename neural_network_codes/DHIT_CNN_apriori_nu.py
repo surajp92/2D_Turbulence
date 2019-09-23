@@ -7,7 +7,7 @@ Created on Sat May 25 14:51:02 2019
 
 import numpy as np
 import matplotlib.pyplot as plt
-from keras.models import Sequential, Model, load_model
+from keras.models import Sequential, Model
 from keras.layers import Input, Conv2D, MaxPooling2D, UpSampling2D
 from keras.utils import plot_model
 from keras import backend as K
@@ -316,12 +316,12 @@ class CNN:
         model = Sequential()
         input_img = Input(shape=(self.nx,self.ny,self.nci))
         
-        x = Conv2D(16, (3, 3), activation='relu', padding='same')(input_img)
-        x = Conv2D(8, (3, 3), activation='relu', padding='same')(x)
-        encoded = Conv2D(8, (3, 3), activation='relu', padding='same')(x)
-        x = Conv2D(8, (3, 3), activation='relu', padding='same')(encoded)
-        x = Conv2D(8, (3, 3), activation='relu', padding='same')(x)
-        x = Conv2D(16, (3, 3), activation='relu', padding='same')(x)
+        x = Conv2D(8, (3, 3), activation='relu', padding='same')(input_img)
+#        x = Conv2D(8, (3, 3), activation='relu', padding='same')(x)
+#        encoded = Conv2D(8, (3, 3), activation='relu', padding='same')(x)
+#        x = Conv2D(8, (3, 3), activation='relu', padding='same')(encoded)
+#        x = Conv2D(8, (3, 3), activation='relu', padding='same')(x)
+#        x = Conv2D(16, (3, 3), activation='relu', padding='same')(x)
         decoded = Conv2D(nco, (3, 3), activation='linear', padding='same')(x)
         
 #        x = Conv2D(16, (3, 3), activation='relu', padding='same')(input_img)
@@ -411,57 +411,9 @@ class CNN:
         ------
         y_predict: predicted output by the CNN (has same shape as label used for training)
         '''
-
-        testing_time_init1 = tm.time()
-        y_test = self.model.predict(ftest)
-        t1 = tm.time() - testing_time_init1
         
-        testing_time_init2 = tm.time()
-        y_test = self.model.predict(ftest)
-        #y_test = custom_model.predict(x_test)
-        t2 = tm.time() - testing_time_init2
-        
-        testing_time_init3 = tm.time()
-        y_test = self.model.predict(ftest)
-        y_test = self.model.predict(ftest)
-        t3 = tm.time() - testing_time_init3
-        
-        return y_test,t1,t2,t3
-    
-    def CNN_predict1(self,ftest,ist,ift,nsm):
-        
-        '''
-        predict the label for input features
-        
-        Inputs
-        ------
-        ftest: test data (has same shape as input features used for training)
-        
-        Output
-        ------
-        y_predict: predicted output by the CNN (has same shape as label used for training)
-        '''
-        
-        filepath = 'tcfd_paper_data/new_data/cnn_'+str(ist)+'_'+str(ift)+'_'+str(nsm)
-        
-        custom_model = load_model(filepath+'/CNN_model.hd5',
-                                  custom_objects={'coeff_determination': self.coeff_determination})
-                                  
-        
-        testing_time_init1 = tm.time()
-        y_test = custom_model.predict(ftest)
-        t1 = tm.time() - testing_time_init1
-        
-        testing_time_init2 = tm.time()
-        y_test = custom_model.predict(ftest)
-        t2 = tm.time() - testing_time_init2
-        
-        testing_time_init3 = tm.time()
-        y_test1 = custom_model.predict(ftest)
-        y_test2 = custom_model.predict(ftest)
-        t3 = tm.time() - testing_time_init3
-        
-        return y_test,t1,t2,t3
+        y_predict = self.model.predict(ftest)
+        return y_predict
     
     def CNN_info(self):
         
@@ -500,11 +452,13 @@ istencil = np.int64(l1[6][0])    # 1: nine point, 2: single point
 ifeatures = np.int64(l1[7][0])   # 1: 6 features, 2: 2 features 
 ilabel = np.int64(l1[8][0])      # 1: SGS (tau), 2: eddy-viscosity (nu)
 
+#%%
 obj = DHIT(nx=nx,ny=ny,nxf=nxf,nyf=nyf,freq=freq,n_snapshots=n_snapshots,n_snapshots_train=n_snapshots_train, 
            n_snapshots_test=n_snapshots_test,istencil=istencil,ifeatures=ifeatures,ilabel=ilabel)
 
 max_min = obj.max_min
 
+#%%
 x_train_sc,y_train_sc = obj.x_train,obj.y_train
 x_test_sc,y_test_sc = obj.x_test,obj.y_test
 
@@ -527,16 +481,15 @@ loss, val_loss, mse, val_mse = model.CNN_history(history_callback)
 nn_history(loss, val_loss, mse, val_mse, istencil, ifeatures, n_snapshots_train)
 
 #%%
-model.CNN_save('./nn_history/CNN_model.hd5')
+model.CNN_save('./nn_history/CNN_model.h5')
 
-#testing_time_init = tm.time()
-y_pred_sc, t1, t2, t3 = model.CNN_predict(x_test_sc)
-
-#total_testing_time = tm.time() - testing_time_init
+testing_time_init = tm.time()
+y_pred_sc = model.CNN_predict(x_test_sc)
+total_testing_time = tm.time() - testing_time_init
 
 with open('cpu_time.csv', 'a', newline='') as myfile:
      wr = csv.writer(myfile, quoting=csv.QUOTE_ALL)
-     wr.writerow(['CNN',istencil, ifeatures, n_snapshots_train, total_training_time, t1, t2, t3])
+     wr.writerow(['CNN',istencil, ifeatures, n_snapshots_train, total_training_time, total_testing_time])
 
 #%% unscale the predicted data
 y_test = np.zeros(shape=(1, nx+1, ny+1, 3), dtype='double')

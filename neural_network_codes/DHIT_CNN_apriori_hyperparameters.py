@@ -7,10 +7,11 @@ Created on Sat May 25 14:51:02 2019
 
 import numpy as np
 import matplotlib.pyplot as plt
-from keras.models import Sequential, Model, load_model
+from keras.models import Sequential, Model
 from keras.layers import Input, Conv2D, MaxPooling2D, UpSampling2D
 from keras.utils import plot_model
 from keras import backend as K
+from keras import optimizers
 from scipy.interpolate import UnivariateSpline
 from scipy.stats import norm 
 from numpy.random import seed
@@ -21,6 +22,13 @@ from utils import *
 import os
 import time as tm
 import csv
+
+from sklearn.model_selection import GridSearchCV
+from keras.wrappers.scikit_learn import KerasRegressor
+from sklearn.model_selection import RandomizedSearchCV, KFold
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import fbeta_score, make_scorer
+from keras.regularizers import l2
 
 #%%
 #Class of problem to solve 2D decaying homogeneous isotrpic turbulence
@@ -323,24 +331,7 @@ class CNN:
         x = Conv2D(8, (3, 3), activation='relu', padding='same')(x)
         x = Conv2D(16, (3, 3), activation='relu', padding='same')(x)
         decoded = Conv2D(nco, (3, 3), activation='linear', padding='same')(x)
-        
-#        x = Conv2D(16, (3, 3), activation='relu', padding='same')(input_img)
-#        x = MaxPooling2D((2, 2), padding='same')(x)
-#        x = Conv2D(8, (3, 3), activation='relu', padding='same')(x)
-#        x = MaxPooling2D((2, 2), padding='same')(x)
-#        x = Conv2D(8, (3, 3), activation='relu', padding='same')(x)
-#        encoded = MaxPooling2D((2, 2), padding='same')(x)
-#        
-#        # at this point the representation is (4, 4, 8) i.e. 128-dimensional
-#
-#        x = Conv2D(8, (3, 3), activation='relu', padding='same')(encoded)
-#        x = UpSampling2D((2, 2))(x)
-#        x = Conv2D(8, (3, 3), activation='relu', padding='same')(x)
-#        x = UpSampling2D((2, 2))(x)
-#        x = Conv2D(16, (3, 3), activation='relu')(x)
-#        x = UpSampling2D((2,2))(x)
-#        decoded = Conv2D(nco, (3, 3), activation='linear', padding='same')(x)
-        
+                
         model = Model(input_img, decoded)
         return model
 
@@ -411,57 +402,9 @@ class CNN:
         ------
         y_predict: predicted output by the CNN (has same shape as label used for training)
         '''
-
-        testing_time_init1 = tm.time()
-        y_test = self.model.predict(ftest)
-        t1 = tm.time() - testing_time_init1
         
-        testing_time_init2 = tm.time()
-        y_test = self.model.predict(ftest)
-        #y_test = custom_model.predict(x_test)
-        t2 = tm.time() - testing_time_init2
-        
-        testing_time_init3 = tm.time()
-        y_test = self.model.predict(ftest)
-        y_test = self.model.predict(ftest)
-        t3 = tm.time() - testing_time_init3
-        
-        return y_test,t1,t2,t3
-    
-    def CNN_predict1(self,ftest,ist,ift,nsm):
-        
-        '''
-        predict the label for input features
-        
-        Inputs
-        ------
-        ftest: test data (has same shape as input features used for training)
-        
-        Output
-        ------
-        y_predict: predicted output by the CNN (has same shape as label used for training)
-        '''
-        
-        filepath = 'tcfd_paper_data/new_data/cnn_'+str(ist)+'_'+str(ift)+'_'+str(nsm)
-        
-        custom_model = load_model(filepath+'/CNN_model.hd5',
-                                  custom_objects={'coeff_determination': self.coeff_determination})
-                                  
-        
-        testing_time_init1 = tm.time()
-        y_test = custom_model.predict(ftest)
-        t1 = tm.time() - testing_time_init1
-        
-        testing_time_init2 = tm.time()
-        y_test = custom_model.predict(ftest)
-        t2 = tm.time() - testing_time_init2
-        
-        testing_time_init3 = tm.time()
-        y_test1 = custom_model.predict(ftest)
-        y_test2 = custom_model.predict(ftest)
-        t3 = tm.time() - testing_time_init3
-        
-        return y_test,t1,t2,t3
+        y_predict = self.model.predict(ftest)
+        return y_predict
     
     def CNN_info(self):
         
@@ -482,11 +425,71 @@ class CNN:
         model_name: name of the file to be saved (.hd5 file)
         '''
         self.model.save(model_name)
+
+#%%
+def coeff_determination(y_true, y_pred):
+    SS_res =  K.sum(K.square( y_true-y_pred ))
+    SS_tot = K.sum(K.square( y_true - K.mean(y_true) ) )
+    return ( 1 - SS_res/(SS_tot + K.epsilon()) )
+
+def build_cnn_model(n_layers=2,n_kernels=16, lr=0.001, nx=65, ny=65, nci=10, nco=3):
+    model = Sequential()
+    input_img = Input(shape=(nx,ny,nci))
+    
+    x = Conv2D(n_kernels, (3, 3), activation='relu', padding='same')(input_img)
+    
+    for i in range(1,n_layers):
+        x = Conv2D(n_kernels, (3, 3), activation='relu', padding='same')(x)
+ 
+    decoded = Conv2D(nco, (3, 3), activation='linear', padding='same')(x)
+    
+    model = Model(input_img, decoded)
+           
+    adam = optimizers.Adam(lr=lr, beta_1=0.9, beta_2=0.999, epsilon=None, decay=0.0, amsgrad=False)
+    model.compile(loss='mean_squared_error', optimizer=adam, metrics=[coeff_determination])
+    
+    model.summary()
+    
+    return model
+
+cnn_model = build_cnn_model()
+cnn_model.summary()
+
+#%%
+model_cnn = KerasRegressor(
+    build_fn = build_cnn_model,
+    epochs=400, batch_size=256, verbose=-1)
+
+def coeff_determination_score(y_true, y_pred):
+    SS_res =  np.sum(np.square( y_true-y_pred ))
+    SS_tot = np.sum(np.square(y_true - np.mean(y_true) ) )
+    return ( 1 - SS_res/(SS_tot + 1e-7) )
+
+my_custom_scorer = make_scorer(coeff_determination_score, greater_is_better=True)
+
+n_layers = [4,6,8,10]
+n_kernels = [8,16,24,32]
+lr_params = [0.001]
+
+keras_param_options = {
+    'n_layers': n_layers,
+    'n_kernels': n_kernels,  
+    'lr': lr_params
+}
+
+rs_lstm = GridSearchCV( 
+    estimator = model_cnn, 
+    param_grid = keras_param_options,
+    scoring = my_custom_scorer,
+    cv = 5,
+    n_jobs = -5,
+    #verbose = -1
+)
         
 #%%
 # generate training and testing data for CNN
 l1 = []
-with open('cnn.txt') as f:
+with open('cnn_hp.txt') as f:
     for l in f:
         l1.append((l.strip()).split("\t"))
 
@@ -500,11 +503,13 @@ istencil = np.int64(l1[6][0])    # 1: nine point, 2: single point
 ifeatures = np.int64(l1[7][0])   # 1: 6 features, 2: 2 features 
 ilabel = np.int64(l1[8][0])      # 1: SGS (tau), 2: eddy-viscosity (nu)
 
+#%%
 obj = DHIT(nx=nx,ny=ny,nxf=nxf,nyf=nyf,freq=freq,n_snapshots=n_snapshots,n_snapshots_train=n_snapshots_train, 
            n_snapshots_test=n_snapshots_test,istencil=istencil,ifeatures=ifeatures,ilabel=ilabel)
 
 max_min = obj.max_min
 
+#%%
 x_train_sc,y_train_sc = obj.x_train,obj.y_train
 x_test_sc,y_test_sc = obj.x_test,obj.y_test
 
@@ -512,193 +517,23 @@ nt,nx_train,ny_train,nci = x_train_sc.shape
 nt,nx_train,ny_train,nco = y_train_sc.shape 
 
 #%%
-# train the CNN model and predict for the test data
-model = CNN(x_train_sc,y_train_sc,nx_train,ny_train,nci,nco)
-model.CNN_info()
-model.CNN_compile(optimizer='adam')
+rs_result = rs_lstm.fit(x_train_sc, y_train_sc)
+
+means = rs_result.cv_results_['mean_test_score']
+stds = rs_result.cv_results_['std_test_score']
+params = rs_result.cv_results_['params']
+
+for mean, stdev, param in zip(means, stds, params):
+    print("%f (%f) with: %r" % (mean, stdev, param))
+    
+print('Best score obtained: {0}'.format(rs_lstm.best_score_))
+print('Parameters:')
+for param, value in rs_lstm.best_params_.items():
+    print('\t{}: {}'.format(param, value))
 
 #%%
-training_time_init = tm.time()
-history_callback = model.CNN_train(epochs=500,batch_size=32)
-total_training_time = tm.time() - training_time_init
+hp_results = np.vstack((means,stds)).T
+np.savetxt('hP_cnn.csv',hp_results,delimiter=",")
 
-loss, val_loss, mse, val_mse = model.CNN_history(history_callback)
-
-nn_history(loss, val_loss, mse, val_mse, istencil, ifeatures, n_snapshots_train)
-
-#%%
-model.CNN_save('./nn_history/CNN_model.hd5')
-
-#testing_time_init = tm.time()
-y_pred_sc, t1, t2, t3 = model.CNN_predict(x_test_sc)
-
-#total_testing_time = tm.time() - testing_time_init
-
-with open('cpu_time.csv', 'a', newline='') as myfile:
-     wr = csv.writer(myfile, quoting=csv.QUOTE_ALL)
-     wr.writerow(['CNN',istencil, ifeatures, n_snapshots_train, total_training_time, t1, t2, t3])
-
-#%% unscale the predicted data
-y_test = np.zeros(shape=(1, nx+1, ny+1, 3), dtype='double')
-y_pred = np.zeros(shape=(1, nx+1, ny+1, 3), dtype='double')
-
-#%%
-if ilabel == 1:
-    for i in range(3):
-        y_pred[0,:,:,i] = 0.5*(y_pred_sc[0,:,:,i]*(max_min[i+10,0] - max_min[i+10,1]) + (max_min[i+10,0] + max_min[i+10,1]))
-        y_test[0,:,:,i] = 0.5*(y_test_sc[0,:,:,i]*(max_min[i+10,0] - max_min[i+10,1]) + (max_min[i+10,0] + max_min[i+10,1]))    
-
-elif ilabel == 2:
-    for i in range(1):
-        y_pred[0,:,:,i] = 0.5*(y_pred_sc[0,:,:,i]*(max_min[i+13,0] - max_min[i+13,1]) + (max_min[i+13,0] + max_min[i+13,1]))
-        y_test[0,:,:,i] = 0.5*(y_test_sc[0,:,:,i]*(max_min[i+13,0] - max_min[i+13,1]) + (max_min[i+13,0] + max_min[i+13,1]))   
-        
-export_resutls(y_test[0], y_pred[0],  ilabel, istencil, ifeatures, n_snapshots_train, nxf, nx, nn=2)
-
-#%%
-folder = "data_"+ str(nxf) + "_" + str(nx) 
-m = n_snapshots_test
-file_input = "../data_spectral/"+folder+"/smag_shear_stress/ts_"+str(m)+".csv"
-ts = np.genfromtxt(file_input, delimiter=',')
-ts = ts.reshape((3,nx+1,ny+1))
-t11s = ts[0,:,:]
-t12s = ts[1,:,:]
-t22s = ts[2,:,:]
-
-folder = "data_"+ str(nxf) + "_" + str(nx) 
-m = n_snapshots_test
-file_input = "../data_spectral/"+folder+"/nu_smag/nus_"+str(m)+".csv"
-tnu = np.genfromtxt(file_input, delimiter=',')
-
-#%%
-if ilabel == 1:
-    num_bins = 64
-    
-    fig, axs = plt.subplots(1,3,figsize=(13,4))
-    axs[0].set_yscale('log')
-    axs[1].set_yscale('log')
-    axs[2].set_yscale('log')
-    
-    # the histogram of the data
-    axs[0].hist(y_test[0,:,:,0].flatten(), num_bins, histtype='step', alpha=1, color='r',zorder=5,
-               linewidth=2.0,range=(-4*np.std(y_test[0,:,:,0]),4*np.std(y_test[0,:,:,0])),density=True,label="True")
-    
-    axs[0].hist(t11s.flatten(), num_bins, histtype='step', alpha=1,color='g',zorder=10,
-                linewidth=2.0,range=(-4*np.std(y_test[0,:,:,0]),4*np.std(y_test[0,:,:,0])),density=True,label=r"Dynamic")
-    
-    axs[0].hist(y_pred[0,:,:,0].flatten(), num_bins, histtype='step', alpha=1,color='b',zorder=10,
-               linewidth=2.0,range=(-4*np.std(y_test[0,:,:,0]),4*np.std(y_test[0,:,:,0])),density=True,label="CNN")
-    
-    #axs[0].hist(t11st.flatten(), num_bins, histtype='step', alpha=1,color='k',zorder=10,
-    #            linewidth=2.0,range=(-4*np.std(y_test[0,:,:,0]),4*np.std(y_test[0,:,:,0])),density=True,label=r"$C_s=0.18$")
-    
-    
-    x_ticks = np.arange(-4*np.std(y_test[0,:,:,0]), 4.1*np.std(y_test[0,:,:,0]), np.std(y_test[0,:,:,0]))                                  
-    x_labels = [r"${} \sigma$".format(i) for i in range(-4,5)]
-    axs[0].set_xlabel(r"$\tau_{11}$")
-    axs[0].set_ylabel("PDF")
-    axs[0].set_xticks(x_ticks)                                                           
-    axs[0].set_xticklabels(x_labels)              
-    
-    #------#
-    axs[1].hist(y_test[0,:,:,1].flatten(), num_bins, histtype='step', alpha=1, color='r',zorder=5,
-               linewidth=2.0,range=(-4*np.std(y_test[0,:,:,1]),4*np.std(y_test[0,:,:,1])),density=True,label="True")
-    
-    axs[1].hist(t12s.flatten(), num_bins, histtype='step', alpha=1,color='g',zorder=10,
-                linewidth=2.0,range=(-4*np.std(y_test[0,:,:,1]),4*np.std(y_test[0,:,:,1])),density=True,label=r"Dynamic")
-    
-    axs[1].hist(y_pred[0,:,:,1].flatten(), num_bins, histtype='step', alpha=1,color='b',zorder=10,
-               linewidth=2.0,range=(-4*np.std(y_test[0,:,:,1]),4*np.std(y_test[0,:,:,1])),density=True,label="CNN")
-    
-    #axs[1].hist(t12st.flatten(), num_bins, histtype='step', alpha=1,color='k',zorder=10,
-    #            linewidth=2.0,range=(-4*np.std(y_test[0,:,:,1]),4*np.std(y_test[0,:,:,1])),density=True,label=r"$C_s=0.18$")
-    
-    x_ticks = np.arange(-4*np.std(y_test[0,:,:,1]), 4.1*np.std(y_test[0,:,:,1]), np.std(y_test[0,:,:,1]))                                  
-    x_labels = [r"${} \sigma$".format(i) for i in range(-4,5)]
-    axs[1].set_xlabel(r"$\tau_{12}$")
-    #axs[1].set_ylabel("PDF")
-    axs[1].set_xticks(x_ticks)                                                           
-    axs[1].set_xticklabels(x_labels)              
-    
-    #------#
-    axs[2].hist(y_test[0,:,:,2].flatten(), num_bins, histtype='step', alpha=1, color='r',zorder=5,
-               linewidth=2.0,range=(-4*np.std(y_test[0,:,:,2]),4*np.std(y_test[0,:,:,2])),density=True,label="True")
-    
-    axs[2].hist(t22s.flatten(), num_bins, histtype='step', alpha=1,color='g',zorder=10,
-                linewidth=2.0,range=(-4*np.std(y_test[0,:,:,2]),4*np.std(y_test[0,:,:,2])),density=True,label=r"Dynamic")
-    
-    axs[2].hist(y_pred[0,:,:,2].flatten(), num_bins, histtype='step', alpha=1,color='b',zorder=10,
-               linewidth=2.0,range=(-4*np.std(y_test[0,:,:,2]),4*np.std(y_test[0,:,:,2])),density=True,label="CNN")
-    
-    #axs[2].hist(t22st.flatten(), num_bins, histtype='step', alpha=1,color='k',zorder=10,
-    #            linewidth=2.0,range=(-4*np.std(y_test[0,:,:,2]),4*np.std(y_test[0,:,:,2])),density=True,label=r"$C_s=0.18$")
-    
-    x_ticks = np.arange(-4*np.std(y_test[0,:,:,2]), 4.1*np.std(y_test[0,:,:,2]), np.std(y_test[0,:,:,2]))                                  
-    x_labels = [r"${} \sigma$".format(i) for i in range(-4,5)]
-    axs[2].set_xlabel(r"$\tau_{22}$")
-    #axs[2].set_ylabel("PDF")
-    axs[2].set_xticks(x_ticks)                                                           
-    axs[2].set_xticklabels(x_labels)              
-    
-    fig.tight_layout()
-    fig.subplots_adjust(hspace=0.5, bottom=0.25)
-    line_labels = ["True", "DSM", "CNN"]
-    plt.figlegend( line_labels,  loc = 'lower center', borderaxespad=0.3, ncol=3, labelspacing=0.,  prop={'size': 13} )
-    plt.show()
-    
-    fig.savefig('nn_history/ts_cnn_'+str(istencil)+'_'+str(ifeatures)+'_'+str(n_snapshots_train)+'.pdf', bbox_inches = 'tight')
-
-elif ilabel == 2:
-    num_bins = 64
-    
-    fig, axs = plt.subplots(1,1,figsize=(6,4))
-    axs.set_yscale('log')
-
-    
-    # the histogram of the data
-    axs.hist(y_test[0,:,:,0].flatten(), num_bins, histtype='step', alpha=1, color='r',zorder=5,
-               linewidth=2.0,range=(0*np.std(y_test[0,:,:,0]),4*np.std(y_test[0,:,:,0])),density=True,label="True")
-    
-    axs.hist(tnu.flatten(), num_bins, histtype='step', alpha=1,color='g',zorder=10,
-                linewidth=2.0,range=(0*np.std(y_test[0,:,:,0]),4*np.std(y_test[0,:,:,0])),density=True,label=r"Dynamic")
-    
-    axs.hist(y_pred[0,:,:,0].flatten(), num_bins, histtype='step', alpha=1,color='b',zorder=10,
-               linewidth=2.0,range=(0*np.std(y_test[0,:,:,0]),4*np.std(y_test[0,:,:,0])),density=True,label="CNN")  
-    
-    x_ticks = np.arange(0*np.std(y_test[0,:,:,0]), 4.1*np.std(y_test[0,:,:,0]), np.std(y_test[0,:,:,0]))                                  
-    x_labels = [r"${} \sigma$".format(i) for i in range(0,5)]
-    axs.set_xlabel(r"$\tau_{11}$")
-    axs.set_ylabel("PDF")
-    axs.set_xticks(x_ticks)                                                           
-    axs.set_xticklabels(x_labels)              
-           
-    fig.tight_layout()
-    fig.subplots_adjust(hspace=0.5, bottom=0.25)
-    line_labels = ["True", "DSM", "CNN"]
-    plt.figlegend( line_labels,  loc = 'lower center', borderaxespad=0.3, ncol=3, labelspacing=0.,  prop={'size': 13} )
-    plt.show()
-    
-    fig.savefig('nn_history/ts_cnn_'+str(istencil)+'_'+str(ifeatures)+'_'+str(n_snapshots_train)+'.pdf', bbox_inches = 'tight')
-    
-#%%
-# contour plot of shear stresses
-fig, axs = plt.subplots(1,3,sharey=True,figsize=(10.5,3.5))
-
-cs = axs[0].contourf(y_test[0,:,:,0].T, 120, cmap = 'jet', interpolation='bilinear')
-axs[0].text(0.4, -0.1, 'True', transform=axs[0].transAxes, fontsize=14, va='top')
-
-cs = axs[1].contourf(y_test[0,:,:,1].T, 120, cmap = 'jet', interpolation='bilinear')
-axs[1].text(0.4, -0.1, 'CNN', transform=axs[1].transAxes, fontsize=14, va='top')
-
-cs = axs[2].contourf(t11s.T, 120, cmap = 'jet', interpolation='bilinear')
-axs[2].text(0.4, -0.1, 'Smag', transform=axs[2].transAxes, fontsize=14, va='top')
-
-fig.tight_layout() 
-
-fig.subplots_adjust(bottom=0.15)
-
-cbar_ax = fig.add_axes([0.22, -0.05, 0.6, 0.04])
-fig.colorbar(cs, cax=cbar_ax, orientation='horizontal')
-plt.show()
 
 

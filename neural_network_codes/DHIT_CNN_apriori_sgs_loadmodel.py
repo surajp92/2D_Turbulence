@@ -22,6 +22,14 @@ import os
 import time as tm
 import csv
 
+font = {'family' : 'Times New Roman',
+        'size'   : 14}    
+plt.rc('font', **font)
+
+import matplotlib as mpl
+mpl.rcParams['text.usetex'] = True
+mpl.rcParams['text.latex.preamble'] = [r'\usepackage{amsmath}']
+
 #%%
 #Class of problem to solve 2D decaying homogeneous isotrpic turbulence
 class DHIT:
@@ -324,23 +332,6 @@ class CNN:
         x = Conv2D(16, (3, 3), activation='relu', padding='same')(x)
         decoded = Conv2D(nco, (3, 3), activation='linear', padding='same')(x)
         
-#        x = Conv2D(16, (3, 3), activation='relu', padding='same')(input_img)
-#        x = MaxPooling2D((2, 2), padding='same')(x)
-#        x = Conv2D(8, (3, 3), activation='relu', padding='same')(x)
-#        x = MaxPooling2D((2, 2), padding='same')(x)
-#        x = Conv2D(8, (3, 3), activation='relu', padding='same')(x)
-#        encoded = MaxPooling2D((2, 2), padding='same')(x)
-#        
-#        # at this point the representation is (4, 4, 8) i.e. 128-dimensional
-#
-#        x = Conv2D(8, (3, 3), activation='relu', padding='same')(encoded)
-#        x = UpSampling2D((2, 2))(x)
-#        x = Conv2D(8, (3, 3), activation='relu', padding='same')(x)
-#        x = UpSampling2D((2, 2))(x)
-#        x = Conv2D(16, (3, 3), activation='relu')(x)
-#        x = UpSampling2D((2,2))(x)
-#        decoded = Conv2D(nco, (3, 3), activation='linear', padding='same')(x)
-        
         model = Model(input_img, decoded)
         return model
 
@@ -510,6 +501,182 @@ x_test_sc,y_test_sc = obj.x_test,obj.y_test
 
 nt,nx_train,ny_train,nci = x_train_sc.shape
 nt,nx_train,ny_train,nco = y_train_sc.shape 
+
+#%% visualization for each layer
+def coeff_determination(y_true, y_pred):
+    SS_res =  K.sum(K.square( y_true-y_pred ))
+    SS_tot = K.sum(K.square( y_true - K.mean(y_true) ) )
+    return ( 1 - SS_res/(SS_tot + K.epsilon()) )
+    
+from keras.models import load_model
+model2=load_model('./CNN_model.hd5',custom_objects={'coeff_determination': coeff_determination})
+
+first = Sequential()
+first.add(model2.layers[0])
+first.add(model2.layers[1])
+first.compile(optimizer='adam',loss='mean_squared_error')
+out_first = first.predict(x_test_sc)
+
+#%%
+import matplotlib.gridspec as gridspec
+
+fig = plt.figure(figsize = (8,2))
+gs1 = gridspec.GridSpec(2, 8)
+gs1.update(wspace=0.025, hspace=0.025) # set the spacing between axes. 
+
+for i in range(16):
+   # i = i + 1 # grid spec indexes from 0
+    ax1 = plt.subplot(gs1[i])
+    ax1.contourf(out_first[0,:,:,i], cmap='jet')
+    plt.axis('off')
+    ax1.set_xticklabels([])
+    ax1.set_yticklabels([])
+    ax1.set_aspect('equal')
+
+#plt.suptitle("First layer")
+fig.tight_layout()
+plt.show()
+fig.savefig('./nn_history/layer1.eps')
+
+#%%
+second = Sequential()
+second.add(model2.layers[0])
+second.add(model2.layers[1])
+second.add(model2.layers[2])
+second.compile(optimizer='adam',loss='mean_squared_error')
+out_second = second.predict(x_test_sc)
+
+fig = plt.figure(figsize = (8,1))
+gs1 = gridspec.GridSpec(1, 8)
+gs1.update(wspace=0.025, hspace=0.025) # set the spacing between axes. 
+
+for i in range(8):
+   # i = i + 1 # grid spec indexes from 0
+    ax1 = plt.subplot(gs1[i])
+    ax1.contourf(out_second[0,:,:,i], cmap='jet')
+    plt.axis('off')
+    ax1.set_xticklabels([])
+    ax1.set_yticklabels([])
+    ax1.set_aspect('equal')
+
+#plt.title("Second layer")
+fig.tight_layout()
+plt.show()
+fig.savefig('./nn_history/layer2.eps')
+
+#%%
+third = Sequential()
+third.add(model2.layers[0])
+third.add(model2.layers[1])
+third.add(model2.layers[2])
+third.add(model2.layers[3])
+third.compile(optimizer='adam',loss='mean_squared_error')
+out_third = third.predict(x_test_sc)
+
+fig = plt.figure(figsize = (8,1))
+gs1 = gridspec.GridSpec(1, 8)
+gs1.update(wspace=0.025, hspace=0.025) # set the spacing between axes. 
+
+for i in range(8):
+   # i = i + 1 # grid spec indexes from 0
+    ax1 = plt.subplot(gs1[i])
+    ax1.contourf(out_third[0,:,:,i], cmap='jet')
+    plt.axis('off')
+    ax1.set_xticklabels([])
+    ax1.set_yticklabels([])
+    ax1.set_aspect('equal')
+
+#plt.title("Second layer")
+fig.tight_layout()
+plt.show()
+fig.savefig('./nn_history/layer3.eps')
+
+#%%
+fourth = Sequential()
+fourth.add(model2.layers[0])
+fourth.add(model2.layers[1])
+fourth.add(model2.layers[2])
+fourth.add(model2.layers[3])
+fourth.add(model2.layers[4])
+fourth.compile(optimizer='adam',loss='mean_squared_error')
+out_fourth = fourth.predict(x_test_sc)
+
+fig = plt.figure(figsize = (8,1))
+gs1 = gridspec.GridSpec(1, 8)
+gs1.update(wspace=0.025, hspace=0.025) # set the spacing between axes. 
+
+for i in range(8):
+   # i = i + 1 # grid spec indexes from 0
+    ax1 = plt.subplot(gs1[i])
+    ax1.contourf(out_fourth[0,:,:,i], cmap='jet')
+    plt.axis('off')
+    ax1.set_xticklabels([])
+    ax1.set_yticklabels([])
+    ax1.set_aspect('equal')
+
+#plt.title("Second layer")
+fig.tight_layout()
+plt.show()
+fig.savefig('./nn_history/layer4.eps')
+
+#%%
+fifth = Sequential()
+fifth.add(model2.layers[0])
+fifth.add(model2.layers[1])
+fifth.add(model2.layers[2])
+fifth.add(model2.layers[3])
+fifth.add(model2.layers[4])
+fifth.add(model2.layers[5])
+fifth.compile(optimizer='adam',loss='mean_squared_error')
+out_fifth = fifth.predict(x_test_sc)
+
+fig = plt.figure(figsize = (8,1))
+gs1 = gridspec.GridSpec(1, 8)
+gs1.update(wspace=0.025, hspace=0.025) # set the spacing between axes. 
+
+for i in range(8):
+   # i = i + 1 # grid spec indexes from 0
+    ax1 = plt.subplot(gs1[i])
+    ax1.contourf(out_fifth[0,:,:,i], cmap='jet')
+    plt.axis('off')
+    ax1.set_xticklabels([])
+    ax1.set_yticklabels([])
+    ax1.set_aspect('equal')
+
+#plt.title("Second layer")
+fig.tight_layout()
+plt.show()
+fig.savefig('./nn_history/layer5.eps')
+#%%
+sixth = Sequential()
+sixth.add(model2.layers[0])
+sixth.add(model2.layers[1])
+sixth.add(model2.layers[2])
+sixth.add(model2.layers[3])
+sixth.add(model2.layers[4])
+sixth.add(model2.layers[5])
+sixth.add(model2.layers[6])
+sixth.compile(optimizer='adam',loss='mean_squared_error')
+out_sixth = sixth.predict(x_test_sc)
+
+fig = plt.figure(figsize = (8,2))
+gs1 = gridspec.GridSpec(2, 8)
+gs1.update(wspace=0.025, hspace=0.025) # set the spacing between axes. 
+
+for i in range(16):
+   # i = i + 1 # grid spec indexes from 0
+    ax1 = plt.subplot(gs1[i])
+    ax1.contourf(out_sixth[0,:,:,i], cmap='jet')
+    plt.axis('off')
+    ax1.set_xticklabels([])
+    ax1.set_yticklabels([])
+    ax1.set_aspect('equal')
+
+#plt.title("Second layer")
+fig.tight_layout()
+plt.show()
+fig.savefig('./nn_history/layer6.eps')
+
 
 #%%
 # train the CNN model and predict for the test data
