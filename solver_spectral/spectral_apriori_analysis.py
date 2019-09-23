@@ -297,7 +297,7 @@ def grad_spectral(nx,ny,u):
 #%%
 def write_data(uc,vc,uuc,uvc,vvc,ucx,ucy,vcx,vcy,ucxx,ucyy,vcxx,vcyy,S,t,t_s,C,nu_s,nu_t):
     
-    folder = "data_"+ str(nx) + "_" + str(nxc) 
+    folder = "data_"+ str(nx) + "_" + str(nxc) + "_"+"V2"
     if not os.path.exists("../data_spectral/"+folder+"/uc"):
         os.makedirs("../data_spectral/"+folder+"/uc")
         os.makedirs("../data_spectral/"+folder+"/vc")
@@ -500,6 +500,8 @@ def compute_cs_smag(dxc,dyc,nxc,nyc,uc,vc,dac,d11c,d12c,d22c,ics,ifltr,alpha):
     nxcc = int(nxc/alpha)
     nycc = int(nyc/alpha)
     
+    dcs_time_init = tm.time()
+    
     dacc = np.empty((nxc+1,nyc+1))
     d11cc = np.empty((nxc+1,nyc+1))
     d12cc = np.empty((nxc+1,nyc+1))
@@ -559,6 +561,8 @@ def compute_cs_smag(dxc,dyc,nxc,nyc,uc,vc,dac,d11c,d12c,d22c,ics,ifltr,alpha):
 #        bi = simps(simps(bb,y),x)
 #        CS2 = (ai/bi)*np.ones((nxc+1,nyc+1))
         CS2 = (np.sum(0.5*(aa + abs(aa)))/np.sum(bb))*np.ones((nxc+1,nyc+1))
+        dcs_time = tm.time() - dcs_time_init
+        print(n, " ", dcs_time)
         
     elif ics == 2:
         #CS2 = 0.04*np.ones((nxc+1,nyc+1)) # constant
@@ -621,7 +625,9 @@ def compute_stress_smag(nx,ny,nxc,nyc,dxc,dyc,u,v,n,ist,ics,ifltr,alpha):
     t[0,:,:] = t11d
     t[1,:,:] = t12
     t[2,:,:] = t22d
-
+    
+    dsm_time_init = tm.time()
+    
     #Smagorinsky
     delta = np.sqrt(dxc*dyc)
     
@@ -632,19 +638,15 @@ def compute_stress_smag(nx,ny,nxc,nyc,dxc,dyc,u,v,n,ist,ics,ifltr,alpha):
     d12 = 0.5*(ucy+vcx)
     d22 = vcy
     
-    # true viscosity
-    nu_t[0,:,:] = t11d/d11
-    nu_t[1,:,:] = t12/d12
-    nu_t[2,:,:] = t22d/d22
-
-    #da = np.sqrt(2.0*ux*ux + 2.0*vy*vy + (uy+vx)*(uy+vx)) # |S| 
     da = np.sqrt((ucx-vcy)**2 + (ucy+vcx)**2) # |S| 
     
     if ist == 1:
         CS2 = compute_cs_smag(dxc,dyc,nxc,nyc,uc,vc,da,d11,d12,d22,ics,ifltr,alpha) # for Smagorinsky
         nu_s = CS2*delta**2*da
-        print(n, " CS = ", np.max(CS2), " ", (np.min(CS2)),
-              " ", np.mean((CS2)), " ", np.std((CS2)))
+        
+        dsm_time = tm.time() - dsm_time_init
+        
+        print(n, " CS = ", np.mean((CS2)), " ", dsm_time)
 
         t11_s = - 2.0*CS2*delta**2*da*d11
         t12_s = - 2.0*CS2*delta**2*da*d12
@@ -663,8 +665,12 @@ def compute_stress_smag(nx,ny,nxc,nyc,dxc,dyc,u,v,n,ist,ics,ifltr,alpha):
         t_s[1,:,:] = t12_b
         t_s[2,:,:] = t22_b - 0.5*(t11_b+t22_b)
     
-    # compute second-order derivative
+    # true viscosity
+    nu_t[0,:,:] = t11d/d11
+    nu_t[1,:,:] = t12/d12
+    nu_t[2,:,:] = t22d/d22
     
+    # compute second-order derivative
     ucxx,ucxy = grad_spectral(nxc,nyc,ucx)
     ucyx,ucyy = grad_spectral(nxc,nyc,ucy) 
     vcxx,vcxy = grad_spectral(nxc,nyc,vcx)
@@ -1356,7 +1362,7 @@ dxc = lx/np.float64(nxc)
 dyc = ly/np.float64(nyc)
     
 #%%
-for n in range(1,ns+1):
+for n in range(ns-5,ns+1):
     folder = "data_"+str(nx)
     file_input = "../data_spectral/"+folder+"/05_streamfunction/s_"+str(n)+".csv"
     s = np.genfromtxt(file_input, delimiter=',')

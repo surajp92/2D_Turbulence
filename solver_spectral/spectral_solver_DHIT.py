@@ -29,11 +29,15 @@ from matplotlib import cm
 from matplotlib.ticker import LinearLocator, FormatStrFormatter
 from scipy.interpolate import UnivariateSpline
 from matplotlib.colors import LightSource
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 font = {'family' : 'Times New Roman',
         'size'   : 14}    
 plt.rc('font', **font)
 
+import matplotlib as mpl
+mpl.rcParams['text.usetex'] = True
+mpl.rcParams['text.latex.preamble'] = [r'\usepackage{amsmath}']
 #%%
 def exact_tgv(nx,ny,time,re):
     
@@ -268,6 +272,8 @@ def energy_spectrum(nx,ny,w):
 
     kx = np.empty(nx)
     ky = np.empty(ny)
+    
+    dx = 2*np.pi/nx
     
     kx[0:int(nx/2)] = 2*np.pi/(np.float64(nx)*dx)*np.float64(np.arange(0,int(nx/2)))
     kx[int(nx/2):nx] = 2*np.pi/(np.float64(nx)*dx)*np.float64(np.arange(-int(nx/2),0))
@@ -821,10 +827,90 @@ fig.colorbar(surf, shrink=0.5, aspect=5)
 ax.view_init(elev=60, azim=30)
 plt.show()
 
-#%%
 fig.savefig("vorticity_3D1.png", dpi=300, bbox_inches = 'tight')
 
+#%%
+def plot_w_ens():
+    lx = 2.0*np.pi
+    ly = 2.0*np.pi
+    nx = 1024
+    ny = 1024
+    nxc = 64
+    dx = lx/np.float64(nx)
+    dy = ly/np.float64(ny)
+    
+    x = np.linspace(0, 2*np.pi, nx+1)
+    y = np.linspace(0, 2*np.pi, ny+1)
+    
+    
+    w0 = decay_ic(nx,ny,dx,dy)
+    
+    folder = "data_"+ str(nx)  
+    
+    file_input = "../data_spectral/"+folder+"/04_vorticity/w_"+str(200)+".csv"
+    w2 = np.genfromtxt(file_input, delimiter=',')
+    
+    file_input = "../data_spectral/"+folder+"/04_vorticity/w_"+str(400)+".csv"
+    w4 = np.genfromtxt(file_input, delimiter=',')
+    
+    fig, axs = plt.subplots(2,2,figsize=(10,9))
 
+    cs = axs[0,0].contour(x,y,w0.T, 10, cmap = 'jet', interpolation='bilinear')
+    axs[0,0].set_xlabel('$x$')
+    axs[0,0].set_ylabel('$y$')
+    axs[0,0].set_title('$t = 0.0$')
+    divider = make_axes_locatable(axs[0,0])
+    cax = divider.append_axes('right', size='5%', pad=0.1)
+    fig.colorbar(cs,cax=cax,orientation='vertical')
+    
+    cs = axs[0,1].contour(x,y,w2.T, 10, cmap = 'jet', interpolation='bilinear')
+    axs[0,1].set_xlabel('$x$')
+    axs[0,1].set_ylabel('$y$')
+    axs[0,1].set_title('$t = 2.0$')   
+    divider = make_axes_locatable(axs[0,1])
+    cax = divider.append_axes('right', size='5%', pad=0.1)
+    fig.colorbar(cs,cax=cax,orientation='vertical')
+    
+    cs = axs[1,0].contour(x,y,w4.T, 10, cmap = 'jet', interpolation='bilinear')
+    axs[1,0].set_xlabel('$x$')
+    axs[1,0].set_ylabel('$y$')
+    axs[1,0].set_title('$t = 4.0$')
+    divider = make_axes_locatable(axs[1,0])
+    cax = divider.append_axes('right', size='5%', pad=0.1)
+    fig.colorbar(cs,cax=cax,orientation='vertical')
+
+    en0, n = energy_spectrum(nx,ny,w0)
+    en2, n = energy_spectrum(nx,ny,w2)
+    en4, n = energy_spectrum(nx,ny,w4)
+    k = np.linspace(1,n,n)
+    
+    k0 = 10.0
+    c = 4.0/(3.0*np.sqrt(np.pi)*(k0**5))           
+    ese = c*(k**4)*np.exp(-(k/k0)**2)
+    
+    line = 100*k**(-3.0)
+    
+    #axs[1,1].loglog(k,ese[:],'k', lw = 2, label='Exact')
+    axs[1,1].loglog(k,en0[1:],'r', ls = '-', lw = 2, label='$t = 0.0$')
+    axs[1,1].loglog(k,en2[1:], 'b', lw = 2, label = '$t = 2.0$')
+    axs[1,1].loglog(k,en4[1:], 'y', lw = 2, label = '$t = 4.0$')
+    axs[1,1].loglog(k,line, 'k--', lw = 2)
+    
+    axs[1,1].set_xlabel('$k$')
+    axs[1,1].set_ylabel('$E(k)$')
+    axs[1,1].legend(loc=0)
+    axs[1,1].set_ylim(1e-16,1e-0)
+    axs[1,1].text(0.8, 0.8, '$k^{-3}$', transform=axs[1,1].transAxes, fontsize=16, fontweight='bold', va='top')
+
+    
+    fig.tight_layout() 
+    plt.show()
+    fig.savefig("../data_spectral/"+folder+"/field_spectral.pdf", bbox_inches = 'tight')
+    fig.savefig("../data_spectral/"+folder+"/field_spectral.eps", bbox_inches = 'tight')
+    fig.savefig("../data_spectral/"+folder+"/field_spectral.png", bbox_inches = 'tight',dpi=175)
+
+plot_w_ens()
+    
 
 
 
