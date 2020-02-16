@@ -337,8 +337,70 @@ def rhs_arakawa(nx,ny,dx,dy,re,w,s):
     return f
 
 #%%
-def rhs_cu3(nx,ny,dx,dy,re,w,s):
+def rhs_cu3(nx,ny,dx,dy,re,pCU3,w,s):
+    lap = np.zeros((nx+5,ny+5))
+    jac = np.zeros((nx+5,ny+5))
+    f = np.zeros((nx+5,ny+5))
     
+    # compute wxx
+    for j in range(2,ny+3):
+        a = w[2:nx+3,j]
+        wxx = c4ddp(a,dx,nx)
+        
+        lap[2:nx+3,j] = wxx[:]
+    
+    # compute wyy
+    for i in range(2,nx+3):
+        a = w[i,2:ny+3]        
+        wyy = c4ddp(a,dx,nx)
+        
+        lap[i,2:ny+3] = lap[i,2:ny+3] + wyy[:]
+    
+    # Jacobian (convective term): upwind
+    
+    # sy: u
+    for i in range(2,nx+3):
+        a = s[i,2:ny+3]        
+        sy = c4dp(a,dx,nx)
+    
+    # computation of wx
+    for j in range(2,ny+3):
+        a = w[2:nx+3,j]
+        
+        # upwind for wx
+        wxp = cu3dp(a, pCU3, dx, nx)
+        # downwind for wx        
+        wxn = cu3dp(a, -pCU3, dx, nx)
+    
+    # upwinding
+    syp = np.where(sy>0,sy,0) # max(sy[i,j],0)
+    syn = np.where(sy<0,sy,0) # min(sy[i,j],0)
+
+    jac[2:nx+3,2:ny+3] = syp*wxp + syn*wxn
+    
+    # sx: -v
+    for j in range(2,ny+3):
+        a = s[2:nx+3,j]
+        sx = c4dp(a, dx, nx)
+    
+    # computation of wy
+    for i in range(2,nx+3):
+        a = w[i,2:ny+3]
+        
+        # upwind for wy
+        wyp = cu3dp(a, pCU3, dy, ny)
+        # downwind for wy        
+        wyn = cu3dp(a, -pCU3, dy, ny)
+    
+    # upwinding
+    sxp = np.where(sx>0,sx,0) # max(sx[i,j],0)
+    sxn = np.where(sx<0,sx,0) # min(sx[i,j],0)
+    
+    jac[2:nx+3,2:ny+3] = jac[2:nx+3,2:ny+3] + sxp*wyp + sxn*wyn
+    
+    f[2:nx+3,2:ny+3] = -jac[2:nx+3,2:ny+3] + lap[2:nx+3,2:ny+3]/re 
+    
+    return f
 
 #%%
 # compute exact solution for TGV problem
