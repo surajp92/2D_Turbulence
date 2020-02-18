@@ -23,6 +23,7 @@ import time as tm
 import matplotlib.ticker as ticker
 import os
 
+from utils import *
 
 font = {'family' : 'Times New Roman',
         'size'   : 14}    
@@ -304,7 +305,7 @@ def jacobian(nx,ny,dx,dy,re,w,s):
 # compute rhs using arakawa scheme
 # computed at all physical domain points (1:nx+1,1:ny+1; all boundary points included)
 # no ghost points
-def rhs_arakawa(nx,ny,dx,dy,re,w,s):
+def rhs_arakawa(nx,ny,dx,dy,re,w,s,ifm,kappa):
     aa = 1.0/(dx*dx)
     bb = 1.0/(dy*dy)
     gg = 1.0/(4.0*dx*dy)
@@ -312,7 +313,7 @@ def rhs_arakawa(nx,ny,dx,dy,re,w,s):
     
     f = np.zeros((nx+5,ny+5))
     
-    #Arakawa
+    #Arakawa    
     j1 = gg*( (w[3:nx+4,2:ny+3]-w[1:nx+2,2:ny+3])*(s[2:nx+3,3:ny+4]-s[2:nx+3,1:ny+2]) \
              -(w[2:nx+3,3:ny+4]-w[2:nx+3,1:ny+2])*(s[3:nx+4,2:ny+3]-s[1:nx+2,2:ny+3]))
 
@@ -320,7 +321,7 @@ def rhs_arakawa(nx,ny,dx,dy,re,w,s):
             - w[1:nx+2,2:ny+3]*(s[1:nx+2,3:ny+4]-s[1:nx+2,1:ny+2]) \
             - w[2:nx+3,3:ny+4]*(s[3:nx+4,3:ny+4]-s[1:nx+2,3:ny+4]) \
             + w[2:nx+3,1:ny+2]*(s[3:nx+4,1:ny+2]-s[1:nx+2,1:ny+2]))
-
+    
     j3 = gg*( w[3:nx+4,3:ny+4]*(s[2:nx+3,3:ny+4]-s[3:nx+4,2:ny+3]) \
             - w[1:nx+2,1:ny+2]*(s[1:nx+2,2:ny+3]-s[2:nx+3,1:ny+2]) \
             - w[1:nx+2,3:ny+4]*(s[2:nx+3,3:ny+4]-s[1:nx+2,2:ny+3]) \
@@ -330,6 +331,55 @@ def rhs_arakawa(nx,ny,dx,dy,re,w,s):
     
     lap = aa*(w[3:nx+4,2:ny+3]-2.0*w[2:nx+3,2:ny+3]+w[1:nx+2,2:ny+3]) \
         + bb*(w[2:nx+3,3:ny+4]-2.0*w[2:nx+3,2:ny+3]+w[2:nx+3,1:ny+2])
+    
+    #call Smagorinsky model       
+    #cs = 0.18
+    #ev = dyn_smag(nx,ny,dx,dy,s)
+    
+    #Central difference for Laplacian
+    # f[2:nx+3,2:ny+3] = -jac + lap/re + ev*lap if using eddy viscosity model for LES
+    if ifm == 0:
+        f[2:nx+3,2:ny+3] = -jac + lap/re 
+        
+    elif ifm == 1:
+        ev = dyn_smag(nx,ny,kappa,s,w)
+        f[2:nx+3,2:ny+3] = -jac + lap/re + ev*lap
+                        
+    return f
+
+#%% 
+# compute rhs using arakawa scheme
+# computed at all physical domain points (1:nx+1,1:ny+1; all boundary points included)
+# no ghost points
+def rhsa(nx,ny,dx,dy,re,we,se):
+    aa = 1.0/(dx*dx)
+    bb = 1.0/(dy*dy)
+    gg = 1.0/(4.0*dx*dy)
+    hh = 1.0/3.0
+    
+    f = np.zeros((nx+5,ny+5))
+    
+    w = we[1:nx+4,1:ny+4]
+    s = se[1:nx+4,1:ny+4]
+    
+    #Arakawa
+    j1 = gg*( (w[2:nx+3,1:ny+2]-w[0:nx+1,1:ny+2])*(s[1:nx+2,2:ny+3]-s[1:nx+2,0:ny+1]) \
+             -(w[1:nx+2,2:ny+3]-w[1:nx+2,0:ny+1])*(s[2:nx+3,1:ny+2]-s[0:nx+1,1:ny+2]))
+
+    j2 = gg*( w[2:nx+3,1:ny+2]*(s[2:nx+3,2:ny+3]-s[2:nx+3,0:ny+1]) \
+            - w[0:nx+1,1:ny+2]*(s[0:nx+1,2:ny+3]-s[0:nx+1,0:ny+1]) \
+            - w[1:nx+2,2:ny+3]*(s[2:nx+3,2:ny+3]-s[0:nx+1,2:ny+3]) \
+            + w[1:nx+2,0:ny+1]*(s[2:nx+3,0:ny+1]-s[0:nx+1,0:ny+1]))
+
+    j3 = gg*( w[2:nx+3,2:ny+3]*(s[1:nx+2,2:ny+3]-s[2:nx+3,1:ny+2]) \
+            - w[0:nx+1,0:ny+1]*(s[0:nx+1,1:ny+2]-s[1:nx+2,0:ny+1]) \
+            - w[0:nx+1,2:ny+3]*(s[1:nx+2,2:ny+3]-s[0:nx+1,1:ny+2]) \
+            + w[2:nx+3,0:ny+1]*(s[2:nx+3,1:ny+2]-s[1:nx+2,0:ny+1]) )
+
+    jac = (j1+j2+j3)*hh
+    
+    lap = aa*(w[2:nx+3,1:ny+2]-2.0*w[1:nx+2,1:ny+2]+w[0:nx+1,1:ny+2]) \
+        + bb*(w[1:nx+2,2:ny+3]-2.0*w[1:nx+2,1:ny+2]+w[1:nx+2,0:ny+1])
     
     #call Smagorinsky model       
     #cs = 0.18
@@ -699,37 +749,6 @@ def coarsen(nx,ny,nxc,nyc,w,wc):
     
     wc = bc(nxc,nyc,wc)
     
-#%% coarsening
-def write_data(nx,ny,dx,dy,nxc,nyc,dxc,dyc,w,s,k,freq):
-    wc = np.zeros((nxc+3,nyc+3))
-    sc = np.zeros((nxc+3,nyc+3))
-    
-    coarsen(nx,ny,nxc,nyc,w,wc)
-        
-    sc = fps(nxc, nyc, dxc, dyc, -wc)
-    sc = bc(nxc,nyc,sc) # coarse streamfunction field
-
-    j = np.zeros((nx+3,ny+3)) # jacobian for fine solution field
-    jc = np.zeros((nxc+3,nyc+3)) # coarsened(jacobian field)
-    jcoarse = np.zeros((nxc+3,nyc+3)) # jacobian(coarsened solution field)
-    
-    j[1:nx+2,1:ny+2] = jacobian(nx,ny,dx,dy,re,w,s)
-    coarsen(nx,ny,nxc,nyc,j,jc)
-        
-    jcoarse[1:nxc+2,1:nyc+2] = jacobian(nxc,nyc,dxc,dyc,re,wc,sc)
-        
-    sgs = jc - jcoarse
-    
-    filename = "fdm/data/01_coarsened_jacobian_field/J_fourier_"+str(int(k/freq))+".csv"
-    np.savetxt(filename, jc, delimiter=",")    
-    filename = "fdm/data/02_jacobian_coarsened_field/J_coarsen_"+str(int(k/freq))+".csv"
-    np.savetxt(filename, jcoarse, delimiter=",")
-    filename = "fdm/data/03_subgrid_scale_term/sgs_"+str(int(k/freq))+".csv"
-    np.savetxt(filename, sgs, delimiter=",")
-    filename = "fdm/data/04_vorticity/w_"+str(int(k/freq))+".csv"
-    np.savetxt(filename, w, delimiter=",")
-    filename = "fdm/data/05_streamfunction/s_"+str(int(k/freq))+".csv"
-    np.savetxt(filename, s, delimiter=",")
 
 #%%
 def export_data(nx,ny,re,n,w,s):
@@ -756,16 +775,15 @@ dt = np.float64(l1[3][0])
 ns = np.int64(l1[4][0])
 isolver = np.int64(l1[5][0])
 isc = np.int64(l1[6][0])
-ich = np.int64(l1[7][0])
+ifm = np.int64(l1[7][0])
 ipr = np.int64(l1[8][0])
 ndc = np.int64(l1[9][0])
+ichkp = np.int64(l1[10][0])
+istart = np.int64(l1[11][0])
+kappa = np.int64(l1[12][0])
+pCU3 = np.float64(l1[13][0])
 
 freq = int(nt/ns)
-
-if (ich != 19):
-    print("Check input.txt file")
-
-pCU3 = 0.0
 
 #%% 
 # assign parameters
@@ -822,7 +840,8 @@ export_data(nx,ny,re,0,w,s)
  
 def rhs(nx,ny,dx,dy,re,pCU3,w,s,isolver):
     if isolver == 1:
-        return rhs_arakawa(nx,ny,dx,dy,re,w,s)
+        return rhs_arakawa(nx,ny,dx,dy,re,w,s,ifm,kappa)
+        #return rhsa(nx,ny,dx,dy,re,w,s)
     if isolver == 2:
         return rhs_compact(nx,ny,dx,dy,re,w,s)
     if isolver == 3:
@@ -848,18 +867,17 @@ for k in range(1,nt+1):
     s = fps(nx, ny, dx, dy, -t)
     s = bc(nx,ny,s)
     
-    r = rhs(nx,ny,dx,dy,re,pCU3,w,s,isolver)
+    r = rhs(nx,ny,dx,dy,re,pCU3,t,s,isolver)
 
     #stage-2
-    t[2:nx+3,2:ny+3] = 0.75*w[2:nx+3,2:ny+3] + 0.25*t[2:nx+3,2:ny+3] + \
-                       0.25*dt*r[2:nx+3,2:ny+3]
+    t[2:nx+3,2:ny+3] = 0.75*w[2:nx+3,2:ny+3] + 0.25*t[2:nx+3,2:ny+3] + 0.25*dt*r[2:nx+3,2:ny+3]
     
     t = bc(nx,ny,t)
     
     s = fps(nx, ny, dx, dy, -t)
     s = bc(nx,ny,s)
     
-    r = rhs(nx,ny,dx,dy,re,pCU3,w,s,isolver)
+    r = rhs(nx,ny,dx,dy,re,pCU3,t,s,isolver)
 
     #stage-3
     w[2:nx+3,2:ny+3] = aa*w[2:nx+3,2:ny+3] + bb*t[2:nx+3,2:ny+3] + bb*dt*r[2:nx+3,2:ny+3]
@@ -876,10 +894,11 @@ for k in range(1,nt+1):
 total_clock_time = tm.time() - clock_time_init
 print('Total clock time=', total_clock_time)
 
+#%%
+# exact solution for TGV problem
 if (ipr == 1):
     we = exact_tgv(nx,ny,x,y,time,re)
-
-#%%
+    
 # compute the exact, initial and final energy spectrum
 if (ipr == 4):
     ent, n = energy_spectrum(nx,ny,w)
@@ -890,25 +909,24 @@ if (ipr == 4):
     c = 4.0/(3.0*np.sqrt(np.pi)*(k0**5))           
     ese = c*(k**4)*np.exp(-(k/k0)**2)
     
-    np.savetxt("energy_arakawa_"+str(nd)+"_"+str(int(re))+".csv", ent, delimiter=",")
+    np.savetxt("energy_arakawa_"+str(int(re))+"_"+str(nd)+".csv", ent, delimiter=",")
 
 #%%
 # contour plot for initial and final vorticity
 fig, axs = plt.subplots(1,2,sharey=True,figsize=(9,5))
 
-cs = axs[0].contourf(x,y,w0[2:nx+3,2:ny+3], 120, cmap = 'jet', interpolation='bilinear')
+cs = axs[0].contourf(x,y,w0[2:nx+3,2:ny+3], 120, cmap = 'jet')
 axs[0].set_title('$t=0$')
 
-cs = axs[1].contourf(x,y,w[2:nx+3,2:ny+3], 120, cmap = 'jet', interpolation='bilinear')
-axs[1].set_title('$t=2$')
+cs = axs[1].contourf(x,y,w[2:nx+3,2:ny+3], 120, cmap = 'jet')
+axs[1].set_title('$t=4$')
 
 fig.tight_layout() 
 
 fig.subplots_adjust(bottom=0.15)
 
 cbar_ax = fig.add_axes([0.2, -0.03, 0.6, 0.04])
-fig.colorbar(cs, cax=cbar_ax, ticks=np.linspace(np.min(w0), np.max(w0), 7), format='%.1f',
-             orientation='horizontal')
+fig.colorbar(cs, cax=cbar_ax, orientation='horizontal')
 plt.show()
 
 fig.savefig("field_fdm.png", bbox_inches = 'tight')
@@ -916,9 +934,9 @@ fig.savefig("field_fdm.png", bbox_inches = 'tight')
 
 #%%
 if (ipr == 4):
-    en_s = np.loadtxt("energy_arakawa_"+str(nd)+"_"+str(int(re))+".csv") 
+
     fig, ax = plt.subplots()
-    fig.set_size_inches(7,5)
+    fig.set_size_inches(6,5)
     
     line = 100*k**(-3.0)
     
@@ -931,8 +949,40 @@ if (ipr == 4):
     plt.xlabel('$K$')
     plt.ylabel('$E(K)$')
     plt.legend(loc=0)
-    plt.ylim(1e-19,1e-1)
+    plt.ylim(1e-12,1e-1)
     fig.savefig('es_fdm.png', bbox_inches = 'tight', pad_inches = 0)
     
 
-    
+#%%
+en_dns = np.loadtxt("energy_arakawa_"+str(int(re))+"_"+str(int(1024))+"_dns.csv")
+en_coarse = np.loadtxt("energy_arakawa_"+str(int(re))+"_"+str(int(nd))+"_coarse.csv")
+en_dsm = np.loadtxt("energy_arakawa_"+str(int(re))+"_"+str(int(nd))+"_dsm.csv")
+ 
+fig, ax = plt.subplots()
+fig.set_size_inches(6,5)
+
+
+kf = np.linspace(1,en_dns.shape[0]-1,en_dns.shape[0]-1)
+
+kl = kf[20:100]
+line = 500*kl**(-3.0)
+
+#ax.loglog(k,ese[:],'k', lw = 2, label='Exact')
+#ax.loglog(k,en0[1:],'r', ls = '--', lw = 2, label='$t = 0.0$')
+
+ax.loglog(kf,en_dns[1:], 'b', lw = 2, label = 'DNS')
+ax.loglog(k,en_dsm[1:], 'g', lw = 2, label = 'DSM')
+ax.loglog(k,ent[1:], 'm', lw = 2, label = 'CU3 ($p=0.25$)')
+ax.loglog(k,en_coarse[1:], 'y', lw = 2, label = 'No model')
+
+ax.loglog(kl,line, 'k-.', lw = 2)
+
+
+plt.xlabel('$K$')
+plt.ylabel('$E(K)$')
+plt.legend(loc=0)
+plt.xlim(1,200)
+plt.ylim(1e-6,1e-1)
+plt.text(50, 1e-2, '$k^-3$', color='k')
+
+fig.savefig('es_fdm_all.png', bbox_inches = 'tight', pad_inches = 0)    

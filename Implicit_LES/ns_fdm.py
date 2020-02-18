@@ -336,8 +336,6 @@ def rhs_arakawa(nx,ny,dx,dy,re,w,s):
                         
     return f
 
-#%%
-def rhs_cu3(nx,ny,dx,dy,re,w,s):
     
 
 #%%
@@ -725,7 +723,7 @@ if (ipr == 4):
     c = 4.0/(3.0*np.sqrt(np.pi)*(k0**5))           
     ese = c*(k**4)*np.exp(-(k/k0)**2)
     
-    np.savetxt("fdm/energy_arakawa_"+str(nd)+"_"+str(int(re))+".csv", en, delimiter=",")
+    #np.savetxt("fdm/energy_arakawa_"+str(nd)+"_"+str(int(re))+".csv", en, delimiter=",")
 
 #%%
 # contour plot for initial and final vorticity
@@ -746,12 +744,12 @@ fig.colorbar(cs, cax=cbar_ax, ticks=np.linspace(np.min(w0), np.max(w0), 7), form
              orientation='horizontal')
 plt.show()
 
-fig.savefig("field_fdm.png", bbox_inches = 'tight')
+fig.savefig("field_fdm_old.png", bbox_inches = 'tight')
 
 
 #%%
 if (ipr == 4):
-    en_s = np.loadtxt("spectral/energy_spectral_"+str(nd)+"_"+str(int(re))+".csv") 
+    #en_s = np.loadtxt("spectral/energy_spectral_"+str(nd)+"_"+str(int(re))+".csv") 
     fig, ax = plt.subplots()
     fig.set_size_inches(7,5)
     
@@ -760,15 +758,15 @@ if (ipr == 4):
     ax.loglog(k,ese[:],'k', lw = 2, label='Exact')
     ax.loglog(k,en0[1:],'r', ls = '--', lw = 2, label='$t = 0.0$')
     ax.loglog(k,en[1:], 'b', lw = 2, label = '$t = '+str(dt*nt)+'$')
-    ax.loglog(k,en_s[1:], 'y', lw = 2, label = '$t = '+str(dt*nt)+'$'+' spectral 1024')
-    ax.loglog(k,line, 'g--', lw = 2, label = 'k^-3')
+    #ax.loglog(k,en_s[1:], 'y', lw = 2, label = '$t = '+str(dt*nt)+'$'+' spectral 1024')
+    ax.loglog(k,line, 'g--', lw = 2, label = '$k^{-3}$')
     
     
     plt.xlabel('$K$')
     plt.ylabel('$E(K)$')
     plt.legend(loc=0)
-    plt.ylim(1e-19,1e-1)
-    fig.savefig('es_fdm.png', bbox_inches = 'tight', pad_inches = 0)
+    plt.ylim(1e-12,1e-1)
+    fig.savefig('es_fdm_old.png', bbox_inches = 'tight', pad_inches = 0)
     
 
     
