@@ -21,6 +21,8 @@ from scipy import linalg
 import matplotlib.pyplot as plt 
 import time as tm
 import matplotlib.ticker as ticker
+import os
+
 
 font = {'family' : 'Times New Roman',
         'size'   : 14}    
@@ -55,7 +57,7 @@ def fps(nx, ny, dx, dy, f):
     data = np.empty((nx,ny), dtype='complex128')
     data1 = np.empty((nx,ny), dtype='complex128')
     
-    data[:,:] = np.vectorize(complex)(f[1:nx+1,1:ny+1],0.0)
+    data[:,:] = np.vectorize(complex)(f[2:nx+2,2:ny+2],0.0)
 
     a = pyfftw.empty_aligned((nx,ny),dtype= 'complex128')
     b = pyfftw.empty_aligned((nx,ny),dtype= 'complex128')
@@ -73,11 +75,11 @@ def fps(nx, ny, dx, dy, f):
     ut = np.real(fft_object_inv(data1))
     
     #periodicity
-    u = np.empty((nx+3,ny+3)) 
-    u[1:nx+1,1:ny+1] = ut
-    u[:,ny+1] = u[:,1]
-    u[nx+1,:] = u[1,:]
-    u[nx+1,ny+1] = u[1,1]
+    u = np.empty((nx+5,ny+5)) 
+    u[2:nx+2,2:ny+2] = ut
+    u[:,ny+2] = u[:,2]
+    u[nx+2,:] = u[2,:]
+    u[nx+2,ny+2] = u[2,2]
     
     return u
 
@@ -243,10 +245,14 @@ def c4ddp(u,h,n):
 # set periodic boundary condition for ghost nodes. Index 0 and (n+2) are the ghost boundary locations
 def bc(nx,ny,u):
     u[:,0] = u[:,ny]
-    u[:,ny+2] = u[:,2]
+    u[:,1] = u[:,ny+1]
+    u[:,ny+3] = u[:,3]
+    u[:,ny+4] = u[:,4]
     
     u[0,:] = u[nx,:]
-    u[nx+2,:] = u[2,:]
+    u[1,:] = u[nx+1,:]
+    u[nx+3,:] = u[3,:]
+    u[nx+4,:] = u[4,:]
     
     return u
 
@@ -254,14 +260,14 @@ def bc(nx,ny,u):
 def smag(nx,ny,dx,dy,s,cs):
         
         
-    dsdxy = (1.0/(4.0*dx*dy))*(s[0:nx+1,0:ny+1] + s[2:nx+3,2:ny+3] \
-                                             -s[2:nx+3,0:ny+1] - s[0:nx+1,2:ny+3])
+    dsdxy = (1.0/(4.0*dx*dy))*(s[1:nx+2,1:ny+2] + s[3:nx+4,3:ny+4] \
+                                             -s[3:nx+4,1:ny+2] - s[1:nx+2,3:ny+4])
     
-    dsdxx = (1.0/(dx*dx))*(s[2:nx+3,1:ny+2] - 2.0*s[1:nx+2,1:ny+2] \
-                                         +s[0:nx+1,1:ny+2])
+    dsdxx = (1.0/(dx*dx))*(s[3:nx+4,2:ny+3] - 2.0*s[2:nx+3,2:ny+3] \
+                                         +s[1:nx+2,2:ny+3])
     
-    dsdyy = (1.0/(dy*dy))*(s[1:nx+2,2:ny+3] - 2.0*s[1:nx+2,1:ny+2] \
-                                         +s[1:nx+2,0:ny+1])
+    dsdyy = (1.0/(dy*dy))*(s[2:nx+3,3:ny+4] - 2.0*s[2:nx+3,2:ny+3] \
+                                         +s[2:nx+3,1:ny+2])
     
     ev = cs*cs*dx*dy*np.sqrt(4.0*dsdxy*dsdxy + (dsdxx-dsdyy)*(dsdxx-dsdyy))
     
@@ -275,19 +281,19 @@ def jacobian(nx,ny,dx,dy,re,w,s):
     gg = 1.0/(4.0*dx*dy)
     hh = 1.0/3.0
     
-    #Arakawa
-    j1 = gg*( (w[2:nx+3,1:ny+2]-w[0:nx+1,1:ny+2])*(s[1:nx+2,2:ny+3]-s[1:nx+2,0:ny+1]) \
-             -(w[1:nx+2,2:ny+3]-w[1:nx+2,0:ny+1])*(s[2:nx+3,1:ny+2]-s[0:nx+1,1:ny+2]))
+    # Arakawa
+    j1 = gg*( (w[3:nx+4,2:ny+3]-w[1:nx+2,2:ny+3])*(s[2:nx+3,3:ny+4]-s[2:nx+3,1:ny+2]) \
+             -(w[2:nx+3,3:ny+4]-w[2:nx+3,1:ny+2])*(s[3:nx+4,2:ny+3]-s[1:nx+2,2:ny+3]))
 
-    j2 = gg*( w[2:nx+3,1:ny+2]*(s[2:nx+3,2:ny+3]-s[2:nx+3,0:ny+1]) \
-            - w[0:nx+1,1:ny+2]*(s[0:nx+1,2:ny+3]-s[0:nx+1,0:ny+1]) \
-            - w[1:nx+2,2:ny+3]*(s[2:nx+3,2:ny+3]-s[0:nx+1,2:ny+3]) \
-            + w[1:nx+2,0:ny+1]*(s[2:nx+3,0:ny+1]-s[0:nx+1,0:ny+1]))
+    j2 = gg*( w[3:nx+4,2:ny+3]*(s[3:nx+4,3:ny+4]-s[3:nx+4,1:ny+2]) \
+            - w[1:nx+2,2:ny+3]*(s[1:nx+2,3:ny+4]-s[1:nx+2,1:ny+2]) \
+            - w[2:nx+3,3:ny+4]*(s[3:nx+4,3:ny+4]-s[1:nx+2,3:ny+4]) \
+            + w[2:nx+3,1:ny+2]*(s[3:nx+4,1:ny+2]-s[1:nx+2,1:ny+2]))
 
-    j3 = gg*( w[2:nx+3,2:ny+3]*(s[1:nx+2,2:ny+3]-s[2:nx+3,1:ny+2]) \
-            - w[0:nx+1,0:ny+1]*(s[0:nx+1,1:ny+2]-s[1:nx+2,0:ny+1]) \
-            - w[0:nx+1,2:ny+3]*(s[1:nx+2,2:ny+3]-s[0:nx+1,1:ny+2]) \
-            + w[2:nx+3,0:ny+1]*(s[2:nx+3,1:ny+2]-s[1:nx+2,0:ny+1]) )
+    j3 = gg*( w[3:nx+4,3:ny+4]*(s[2:nx+3,3:ny+4]-s[3:nx+4,2:ny+3]) \
+            - w[1:nx+2,1:ny+2]*(s[1:nx+2,2:ny+3]-s[2:nx+3,1:ny+2]) \
+            - w[1:nx+2,3:ny+4]*(s[2:nx+3,3:ny+4]-s[1:nx+2,2:ny+3]) \
+            + w[3:nx+4,1:ny+2]*(s[3:nx+4,2:ny+3]-s[2:nx+3,1:ny+2]) )
 
     jac = (j1+j2+j3)*hh
     
@@ -304,26 +310,26 @@ def rhs_arakawa(nx,ny,dx,dy,re,w,s):
     gg = 1.0/(4.0*dx*dy)
     hh = 1.0/3.0
     
-    f = np.zeros((nx+3,ny+3))
+    f = np.zeros((nx+5,ny+5))
     
     #Arakawa
-    j1 = gg*( (w[2:nx+3,1:ny+2]-w[0:nx+1,1:ny+2])*(s[1:nx+2,2:ny+3]-s[1:nx+2,0:ny+1]) \
-             -(w[1:nx+2,2:ny+3]-w[1:nx+2,0:ny+1])*(s[2:nx+3,1:ny+2]-s[0:nx+1,1:ny+2]))
+    j1 = gg*( (w[3:nx+4,2:ny+3]-w[1:nx+2,2:ny+3])*(s[2:nx+3,3:ny+4]-s[2:nx+3,1:ny+2]) \
+             -(w[2:nx+3,3:ny+4]-w[2:nx+3,1:ny+2])*(s[3:nx+4,2:ny+3]-s[1:nx+2,2:ny+3]))
 
-    j2 = gg*( w[2:nx+3,1:ny+2]*(s[2:nx+3,2:ny+3]-s[2:nx+3,0:ny+1]) \
-            - w[0:nx+1,1:ny+2]*(s[0:nx+1,2:ny+3]-s[0:nx+1,0:ny+1]) \
-            - w[1:nx+2,2:ny+3]*(s[2:nx+3,2:ny+3]-s[0:nx+1,2:ny+3]) \
-            + w[1:nx+2,0:ny+1]*(s[2:nx+3,0:ny+1]-s[0:nx+1,0:ny+1]))
+    j2 = gg*( w[3:nx+4,2:ny+3]*(s[3:nx+4,3:ny+4]-s[3:nx+4,1:ny+2]) \
+            - w[1:nx+2,2:ny+3]*(s[1:nx+2,3:ny+4]-s[1:nx+2,1:ny+2]) \
+            - w[2:nx+3,3:ny+4]*(s[3:nx+4,3:ny+4]-s[1:nx+2,3:ny+4]) \
+            + w[2:nx+3,1:ny+2]*(s[3:nx+4,1:ny+2]-s[1:nx+2,1:ny+2]))
 
-    j3 = gg*( w[2:nx+3,2:ny+3]*(s[1:nx+2,2:ny+3]-s[2:nx+3,1:ny+2]) \
-            - w[0:nx+1,0:ny+1]*(s[0:nx+1,1:ny+2]-s[1:nx+2,0:ny+1]) \
-            - w[0:nx+1,2:ny+3]*(s[1:nx+2,2:ny+3]-s[0:nx+1,1:ny+2]) \
-            + w[2:nx+3,0:ny+1]*(s[2:nx+3,1:ny+2]-s[1:nx+2,0:ny+1]) )
+    j3 = gg*( w[3:nx+4,3:ny+4]*(s[2:nx+3,3:ny+4]-s[3:nx+4,2:ny+3]) \
+            - w[1:nx+2,1:ny+2]*(s[1:nx+2,2:ny+3]-s[2:nx+3,1:ny+2]) \
+            - w[1:nx+2,3:ny+4]*(s[2:nx+3,3:ny+4]-s[1:nx+2,2:ny+3]) \
+            + w[3:nx+4,1:ny+2]*(s[3:nx+4,2:ny+3]-s[2:nx+3,1:ny+2]) )
 
     jac = (j1+j2+j3)*hh
     
-    lap = aa*(w[2:nx+3,1:ny+2]-2.0*w[1:nx+2,1:ny+2]+w[0:nx+1,1:ny+2]) \
-        + bb*(w[1:nx+2,2:ny+3]-2.0*w[1:nx+2,1:ny+2]+w[1:nx+2,0:ny+1])
+    lap = aa*(w[3:nx+4,2:ny+3]-2.0*w[2:nx+3,2:ny+3]+w[1:nx+2,2:ny+3]) \
+        + bb*(w[2:nx+3,3:ny+4]-2.0*w[2:nx+3,2:ny+3]+w[2:nx+3,1:ny+2])
     
     #call Smagorinsky model       
     #cs = 0.18
@@ -332,7 +338,7 @@ def rhs_arakawa(nx,ny,dx,dy,re,w,s):
     #Central difference for Laplacian
     # f[1:nx+2,1:ny+2] = -jac + lap/re + ev*lap if using eddy viscosity model for LES
     
-    f[1:nx+2,1:ny+2] = -jac + lap/re 
+    f[2:nx+3,2:ny+3] = -jac + lap/re 
                         
     return f
 
@@ -359,56 +365,119 @@ def rhs_cu3(nx,ny,dx,dy,re,pCU3,w,s):
     # Jacobian (convective term): upwind
     
     # sy: u
+    sy = np.zeros((nx+1,ny+1))
     for i in range(2,nx+3):
         a = s[i,2:ny+3]        
-        sy = c4dp(a,dx,nx)
+        sy[i-2,:] = c4dp(a,dx,nx)
     
     # computation of wx
+    wxp = np.zeros((nx+1,ny+1))
+    wxn = np.zeros((nx+1,ny+1))
     for j in range(2,ny+3):
         a = w[2:nx+3,j]
         
         # upwind for wx
-        wxp = cu3dp(a, pCU3, dx, nx)
+        wxp[:,j-2] = cu3dp(a, pCU3, dx, nx)
         # downwind for wx        
-        wxn = cu3dp(a, -pCU3, dx, nx)
+        wxn[:,j-2] = cu3dp(a, -pCU3, dx, nx)
     
     # upwinding
     syp = np.where(sy>0,sy,0) # max(sy[i,j],0)
     syn = np.where(sy<0,sy,0) # min(sy[i,j],0)
 
-    jac[2:nx+3,2:ny+3] = syp*wxp + syn*wxn
+    #jac[2:nx+3,2:ny+3] = syp*wxp + syn*wxn
     
     # sx: -v
+    sx = np.zeros((nx+1,ny+1))
     for j in range(2,ny+3):
         a = s[2:nx+3,j]
-        sx = c4dp(a, dx, nx)
+        sx[:,j-2] = -c4dp(a, dx, nx)
     
     # computation of wy
+    wyp = np.zeros((nx+1,ny+1))
+    wyn = np.zeros((nx+1,ny+1))
     for i in range(2,nx+3):
         a = w[i,2:ny+3]
         
         # upwind for wy
-        wyp = cu3dp(a, pCU3, dy, ny)
+        wyp[i-2,:] = cu3dp(a, pCU3, dy, ny)
         # downwind for wy        
-        wyn = cu3dp(a, -pCU3, dy, ny)
+        wyn[i-2,:] = cu3dp(a, -pCU3, dy, ny)
     
     # upwinding
     sxp = np.where(sx>0,sx,0) # max(sx[i,j],0)
     sxn = np.where(sx<0,sx,0) # min(sx[i,j],0)
     
-    jac[2:nx+3,2:ny+3] = jac[2:nx+3,2:ny+3] + sxp*wyp + sxn*wyn
+    jac[2:nx+3,2:ny+3] = (syp*wxp + syn*wxn) + (sxp*wyp + sxn*wyn)
     
     f[2:nx+3,2:ny+3] = -jac[2:nx+3,2:ny+3] + lap[2:nx+3,2:ny+3]/re 
+    
+    del sy, sx, syp, syn, sxp, sxn, wxp, wxn, wyp, wyn
+    
+    return f
+
+#%%
+def rhs_compact(nx,ny,dx,dy,re,w,s):
+    lap = np.zeros((nx+5,ny+5))
+    jac = np.zeros((nx+5,ny+5))
+    f = np.zeros((nx+5,ny+5))
+    
+    # compute wxx
+    for j in range(2,ny+3):
+        a = w[2:nx+3,j]
+        wxx = c4ddp(a,dx,nx)
+        
+        lap[2:nx+3,j] = wxx[:]
+    
+    # compute wyy
+    for i in range(2,nx+3):
+        a = w[i,2:ny+3]        
+        wyy = c4ddp(a,dx,nx)
+        
+        lap[i,2:ny+3] = lap[i,2:ny+3] + wyy[:]
+    
+    # Jacobian (convective term): upwind
+    
+    # sy
+    sy = np.zeros((nx+1,ny+1))
+    for i in range(2,nx+3):
+        a = s[i,2:ny+3]        
+        sy[i-2,:] = c4dp(a,dx,nx)
+    
+    # computation of wx
+    wx = np.zeros((nx+1,ny+1))
+    for j in range(2,ny+3):
+        a = w[2:nx+3,j]
+        wx[:,j-2] = c4dp(a,dx,nx)
+        
+    
+    # sx
+    sx = np.zeros((nx+1,ny+1))
+    for j in range(2,ny+3):
+        a = s[2:nx+3,j]
+        sx[:,j-2] = c4dp(a, dx, nx)
+    
+    # computation of wy
+    wy = np.zeros((nx+1,ny+1))
+    for i in range(2,nx+3):
+        a = w[i,2:ny+3]
+        wy[i-2,:] = c4dp(a, dx, nx)
+    
+    jac[2:nx+3,2:ny+3] = (sy*wx - sx*wy)
+    
+    f[2:nx+3,2:ny+3] = -jac[2:nx+3,2:ny+3] + lap[2:nx+3,2:ny+3]/re
+    
+    del sy, wx, sx, wy
     
     return f
 
 #%%
 # compute exact solution for TGV problem
 def exact_tgv(nx,ny,x,y,time,re):
-    ue = np.empty((nx+3,ny+3))
+    ue = np.zeros((nx+5,ny+5))
     
     nq = 4.0
-    ue[1:nx+2, 1:ny+2] = 2.0*nq*np.cos(nq*x[0:nx+1, 0:ny+1])*np.cos(nq*y[0:nx+1, 0:ny+1])*np.exp(-2.0*nq*nq*time/re)
+    ue[2:nx+3, 2:ny+3] = 2.0*nq*np.cos(nq*x[0:nx+1, 0:ny+1])*np.cos(nq*y[0:nx+1, 0:ny+1])*np.exp(-2.0*nq*nq*time/re)
     
     ue = bc(nx,ny,ue)
     return ue
@@ -416,9 +485,9 @@ def exact_tgv(nx,ny,x,y,time,re):
 #%%
 # set initial condition for TGV problem
 def ic_tgv(nx,ny,x,y):
-    w = np.empty((nx+3,ny+3))
+    w = np.zeros((nx+5,ny+5))
     nq = 4.0
-    w[1:nx+2, 1:ny+2] = 2.0*nq*np.cos(nq*x[0:nx+1, 0:ny+1])*np.cos(nq*y[0:nx+1, 0:ny+1])
+    w[2:nx+3, 2:ny+3] = 2.0*nq*np.cos(nq*x[0:nx+1, 0:ny+1])*np.cos(nq*y[0:nx+1, 0:ny+1])
     
     w = bc(nx,ny,w)
 
@@ -427,14 +496,14 @@ def ic_tgv(nx,ny,x,y):
 #%%
 # set initial condition for vortex merger problem
 def ic_vm(nx,ny,x,y):
-    w = np.empty((nx+3,ny+3))
+    w = np.zeros((nx+5,ny+5))
     sigma = np.pi
     xc1 = np.pi-np.pi/4.0
     yc1 = np.pi
     xc2 = np.pi+np.pi/4.0
     yc2 = np.pi
     
-    w[1:nx+2, 1:ny+2] = np.exp(-sigma*((x[0:nx+1, 0:ny+1]-xc1)**2 + (y[0:nx+1, 0:ny+1]-yc1)**2)) \
+    w[2:nx+3, 2:ny+3] = np.exp(-sigma*((x[0:nx+1, 0:ny+1]-xc1)**2 + (y[0:nx+1, 0:ny+1]-yc1)**2)) \
                         + np.exp(-sigma*((x[0:nx+1, 0:ny+1]-xc2)**2 + (y[0:nx+1, 0:ny+1]-yc2)**2))
     
     w = bc(nx,ny,w)
@@ -443,19 +512,28 @@ def ic_vm(nx,ny,x,y):
 
 #%%
 def ic_shear(nx,ny,x,y):
-    w = np.zeros((nx+3,ny+3))
+    w = np.zeros((nx+5,ny+5))
     delta = 0.05
     sigma = 15/np.pi
+    
+#    for j in range(2,ny+3):
+#        for i in range(2,nx+3):
+#            if y[i-2,j-2] <= np.pi:
+#                w[i,j] = delta*np.cos(x[i-2,j-2]) - sigma/  \
+#                        (np.cosh(sigma*(y[i-2,j-2] - np.pi/2)))**2
+#            else:
+#                w[i,j] = delta*np.cos(x[i-2,j-2]) + sigma/  \
+#                        (np.cosh(sigma*(3*np.pi/2 - y[i-2,j-2])))**2
     
     indy = np.array(np.where(y[0,:] <= np.pi))
     indy = indy.flatten()
     
-    w[1:nx+2, indy+1] = delta*np.cos(x[0:nx+1, indy]) - sigma/  \
+    w[2:nx+3, indy+2] = delta*np.cos(x[0:nx+1, indy]) - sigma/  \
                         (np.cosh(sigma*(y[0:nx+1, indy] - np.pi/2)))**2
         
     indy = np.array(np.where(y[0,:] > np.pi))
     indy = indy.flatten()    
-    w[1:nx+2, indy+1] = delta*np.cos(x[0:nx+1, indy]) + sigma/(np.cosh(sigma*(3.0*np.pi/2 - y[0:nx+1, indy])))**2
+    w[2:nx+3, indy+2] = delta*np.cos(x[0:nx+1, indy]) + sigma/(np.cosh(sigma*(3.0*np.pi/2 - y[0:nx+1, indy])))**2
     
     w = bc(nx,ny,w)
     
@@ -465,7 +543,7 @@ def ic_shear(nx,ny,x,y):
 #%%
 # set initial condition for decay of turbulence problem
 def ic_decay(nx,ny,dx,dy):
-    w = np.empty((nx+3,ny+3))
+    #w = np.empty((nx+3,ny+3))
     
     epsilon = 1.0e-6
     
@@ -520,11 +598,11 @@ def ic_decay(nx,ny,dx,dy):
     #w = np.zeros((nx+3,ny+3))
     
     #periodicity
-    w = np.empty((nx+3,ny+3)) 
-    w[1:nx+1,1:ny+1] = ut
-    w[:,ny+1] = w[:,1]
-    w[nx+1,:] = w[1,:]
-    w[nx+1,ny+1] = w[1,1] 
+    w = np.zeros((nx+5,ny+5)) 
+    w[2:nx+2,2:ny+2] = ut
+    w[:,ny+2] = w[:,2]
+    w[nx+2,:] = w[2,:]
+    w[nx+2,ny+2] = w[2,2] 
     
     w = bc(nx,ny,w)    
     
@@ -552,7 +630,7 @@ def energy_spectrum(nx,ny,w):
     b = pyfftw.empty_aligned((nx,ny),dtype= 'complex128')
 
     fft_object = pyfftw.FFTW(a, b, axes = (0,1), direction = 'FFTW_FORWARD')
-    wf = fft_object(w[1:nx+1,1:ny+1]) 
+    wf = fft_object(w[2:nx+2,2:ny+2]) 
     
     es =  np.empty((nx,ny))
     
@@ -621,81 +699,6 @@ def coarsen(nx,ny,nxc,nyc,w,wc):
     
     wc = bc(nxc,nyc,wc)
     
-   
-#%% 
-# read input file
-l1 = []
-with open('input.txt') as f:
-    for l in f:
-        l1.append((l.strip()).split("\t"))
-
-nd = np.int64(l1[0][0])
-nt = np.int64(l1[1][0])
-re = np.float64(l1[2][0])
-dt = np.float64(l1[3][0])
-ns = np.int64(l1[4][0])
-isolver = np.int64(l1[5][0])
-isc = np.int64(l1[6][0])
-ich = np.int64(l1[7][0])
-ipr = np.int64(l1[8][0])
-ndc = np.int64(l1[9][0])
-
-freq = int(nt/ns)
-
-if (ich != 19):
-    print("Check input.txt file")
-
-#%% 
-# assign parameters
-nx = nd
-ny = nd
-
-nxc = ndc
-nyc = ndc
-
-#%%
-pi = np.pi
-lx = 2.0*pi
-ly = 2.0*pi
-
-dx = lx/np.float64(nx)
-dy = ly/np.float64(ny)
-
-dxc = lx/np.float64(nxc)
-dyc = ly/np.float64(nyc)
-
-ifile = 0
-time = 0.0
-
-x = np.linspace(0.0,2.0*np.pi,nx+1)
-y = np.linspace(0.0,2.0*np.pi,ny+1)
-
-x, y = np.meshgrid(x, y, indexing='ij')
-
-#%% 
-# allocate the vorticity and streamfunction arrays
-w = np.empty((nx+3,ny+3)) 
-s = np.empty((nx+3,ny+3))
-
-t = np.empty((nx+3,ny+3))
-
-r = np.empty((nx+3,ny+3))
-
-#%%
-# set the initial condition based on the problem selected
-if (ipr == 1):
-    w0 = ic_tgv(nx,ny,x,y)
-elif (ipr == 2):
-    w0 = ic_vm(nx,ny,x,y)
-elif (ipr == 3):
-    w0 = ic_shear(nx,ny,x,y)
-elif (ipr == 4):
-    w0 = ic_decay(nx,ny,dx,dy)
-    
-w = np.copy(w0)
-s = fps(nx, ny, dx, dy, -w)
-s = bc(nx,ny,s)
-
 #%% coarsening
 def write_data(nx,ny,dx,dy,nxc,nyc,dxc,dyc,w,s,k,freq):
     wc = np.zeros((nxc+3,nyc+3))
@@ -727,8 +730,105 @@ def write_data(nx,ny,dx,dy,nxc,nyc,dxc,dyc,w,s,k,freq):
     np.savetxt(filename, w, delimiter=",")
     filename = "fdm/data/05_streamfunction/s_"+str(int(k/freq))+".csv"
     np.savetxt(filename, s, delimiter=",")
+
+#%%
+def export_data(nx,ny,re,n,w,s):
+    folder = 'data_'+str(int(re)) + '_'+ str(nx) + '_' + str(ny)
     
+    if not os.path.exists('./results/'+folder):
+        os.makedirs('./results/'+folder)
+        
+    filename = './results/'+folder+'/results_' + str(int(n))+'.npz'
+    np.savez(filename,w=w[2:nx+3,2:ny+3],s=s[2:nx+3,2:ny+3])
+        
     
+#%% 
+# read input file
+l1 = []
+with open('input.txt') as f:
+    for l in f:
+        l1.append((l.strip()).split("\t"))
+
+nd = np.int64(l1[0][0])
+nt = np.int64(l1[1][0])
+re = np.float64(l1[2][0])
+dt = np.float64(l1[3][0])
+ns = np.int64(l1[4][0])
+isolver = np.int64(l1[5][0])
+isc = np.int64(l1[6][0])
+ich = np.int64(l1[7][0])
+ipr = np.int64(l1[8][0])
+ndc = np.int64(l1[9][0])
+
+freq = int(nt/ns)
+
+if (ich != 19):
+    print("Check input.txt file")
+
+pCU3 = 0.0
+
+#%% 
+# assign parameters
+nx = nd
+ny = nd
+
+nxc = ndc
+nyc = ndc
+
+#%%
+pi = np.pi
+lx = 2.0*pi
+ly = 2.0*pi
+
+dx = lx/np.float64(nx)
+dy = ly/np.float64(ny)
+
+dxc = lx/np.float64(nxc)
+dyc = ly/np.float64(nyc)
+
+ifile = 0
+time = 0.0
+
+x = np.linspace(0.0,2.0*np.pi,nx+1)
+y = np.linspace(0.0,2.0*np.pi,ny+1)
+
+x, y = np.meshgrid(x, y, indexing='ij')
+
+#%% 
+# allocate the vorticity and streamfunction arrays
+w = np.empty((nx+5,ny+5)) 
+s = np.empty((nx+5,ny+5))
+
+t = np.empty((nx+5,ny+5))
+
+r = np.empty((nx+5,ny+5))
+
+#%%
+# set the initial condition based on the problem selected
+if (ipr == 1):
+    w0 = ic_tgv(nx,ny,x,y)
+elif (ipr == 2):
+    w0 = ic_vm(nx,ny,x,y)
+elif (ipr == 3):
+    w0 = ic_shear(nx,ny,x,y)
+elif (ipr == 4):
+    w0 = ic_decay(nx,ny,dx,dy)
+    
+w = np.copy(w0)
+s = fps(nx, ny, dx, dy, -w)
+s = bc(nx,ny,s)
+
+export_data(nx,ny,re,0,w,s)
+ 
+def rhs(nx,ny,dx,dy,re,pCU3,w,s,isolver):
+    if isolver == 1:
+        return rhs_arakawa(nx,ny,dx,dy,re,w,s)
+    if isolver == 2:
+        return rhs_compact(nx,ny,dx,dy,re,w,s)
+    if isolver == 3:
+        return rhs_cu3(nx,ny,dx,dy,re,pCU3,w,s)
+    
+
 #%%
 # time integration using third-order Runge Kutta method
 aa = 1.0/3.0
@@ -737,30 +837,32 @@ clock_time_init = tm.time()
 
 for k in range(1,nt+1):
     time = time + dt
-    r = rhs_arakawa(nx,ny,dx,dy,re,w,s)
+    
+    r = rhs(nx,ny,dx,dy,re,pCU3,w,s,isolver)
     
     #stage-1
-    t[1:nx+2,1:ny+2] = w[1:nx+2,1:ny+2] + dt*r[1:nx+2,1:ny+2]
+    t[2:nx+3,2:ny+3] = w[2:nx+3,2:ny+3] + dt*r[2:nx+3,2:ny+3]
     
     t = bc(nx,ny,t)
     
     s = fps(nx, ny, dx, dy, -t)
     s = bc(nx,ny,s)
     
-    r = rhs_arakawa(nx,ny,dx,dy,re,t,s)
-    
+    r = rhs(nx,ny,dx,dy,re,pCU3,w,s,isolver)
+
     #stage-2
-    t[1:nx+2,1:ny+2] = 0.75*w[1:nx+2,1:ny+2] + 0.25*t[1:nx+2,1:ny+2] + 0.25*dt*r[1:nx+2,1:ny+2]
+    t[2:nx+3,2:ny+3] = 0.75*w[2:nx+3,2:ny+3] + 0.25*t[2:nx+3,2:ny+3] + \
+                       0.25*dt*r[2:nx+3,2:ny+3]
     
     t = bc(nx,ny,t)
     
     s = fps(nx, ny, dx, dy, -t)
     s = bc(nx,ny,s)
     
-    r = rhs_arakawa(nx,ny,dx,dy,re,t,s)
-    
+    r = rhs(nx,ny,dx,dy,re,pCU3,w,s,isolver)
+
     #stage-3
-    w[1:nx+2,1:ny+2] = aa*w[1:nx+2,1:ny+2] + bb*t[1:nx+2,1:ny+2] + bb*dt*r[1:nx+2,1:ny+2]
+    w[2:nx+3,2:ny+3] = aa*w[2:nx+3,2:ny+3] + bb*t[2:nx+3,2:ny+3] + bb*dt*r[2:nx+3,2:ny+3]
     
     w = bc(nx,ny,w)
     
@@ -769,6 +871,7 @@ for k in range(1,nt+1):
     
     if (k%freq == 0):
         print(k, " ", time)
+        export_data(nx,ny,re,int(k/freq),w,s)
 
 total_clock_time = tm.time() - clock_time_init
 print('Total clock time=', total_clock_time)
@@ -779,7 +882,7 @@ if (ipr == 1):
 #%%
 # compute the exact, initial and final energy spectrum
 if (ipr == 4):
-    en, n = energy_spectrum(nx,ny,w)
+    ent, n = energy_spectrum(nx,ny,w)
     en0, n = energy_spectrum(nx,ny,w0)
     k = np.linspace(1,n,n)
     
@@ -787,16 +890,16 @@ if (ipr == 4):
     c = 4.0/(3.0*np.sqrt(np.pi)*(k0**5))           
     ese = c*(k**4)*np.exp(-(k/k0)**2)
     
-    np.savetxt("fdm/energy_arakawa_"+str(nd)+"_"+str(int(re))+".csv", en, delimiter=",")
+    np.savetxt("energy_arakawa_"+str(nd)+"_"+str(int(re))+".csv", ent, delimiter=",")
 
 #%%
 # contour plot for initial and final vorticity
 fig, axs = plt.subplots(1,2,sharey=True,figsize=(9,5))
 
-cs = axs[0].contourf(x,y,w0[1:nx+2,1:ny+2], 120, cmap = 'jet', interpolation='bilinear')
+cs = axs[0].contourf(x,y,w0[2:nx+3,2:ny+3], 120, cmap = 'jet', interpolation='bilinear')
 axs[0].set_title('$t=0$')
 
-cs = axs[1].contourf(x,y,w[1:nx+2,1:ny+2], 120, cmap = 'jet', interpolation='bilinear')
+cs = axs[1].contourf(x,y,w[2:nx+3,2:ny+3], 120, cmap = 'jet', interpolation='bilinear')
 axs[1].set_title('$t=2$')
 
 fig.tight_layout() 
@@ -813,7 +916,7 @@ fig.savefig("field_fdm.png", bbox_inches = 'tight')
 
 #%%
 if (ipr == 4):
-    en_s = np.loadtxt("spectral/energy_spectral_"+str(nd)+"_"+str(int(re))+".csv") 
+    en_s = np.loadtxt("energy_arakawa_"+str(nd)+"_"+str(int(re))+".csv") 
     fig, ax = plt.subplots()
     fig.set_size_inches(7,5)
     
@@ -821,9 +924,8 @@ if (ipr == 4):
     
     ax.loglog(k,ese[:],'k', lw = 2, label='Exact')
     ax.loglog(k,en0[1:],'r', ls = '--', lw = 2, label='$t = 0.0$')
-    ax.loglog(k,en[1:], 'b', lw = 2, label = '$t = '+str(dt*nt)+'$')
-    ax.loglog(k,en_s[1:], 'y', lw = 2, label = '$t = '+str(dt*nt)+'$'+' spectral 1024')
-    ax.loglog(k,line, 'g--', lw = 2, label = 'k^-3')
+    ax.loglog(k,ent[1:], 'b', lw = 2, label = '$t = '+str(dt*nt)+'$')
+    ax.loglog(k,line, 'g--', lw = 2, label = '$k^-3$')
     
     
     plt.xlabel('$K$')
