@@ -73,10 +73,7 @@ def fps(nx, ny, dx, dy, f):
     fft_object_inv = pyfftw.FFTW(a, b,axes = (0,1), direction = 'FFTW_BACKWARD')
     
     e = fft_object(data)
-    #e = pyfftw.interfaces.scipy_fftpack.fft2(data)
-    
     e[0,0] = 0.0
-    
     data1[:,:] = e[:,:]/(aa + bb*kx[:,:] + cc*ky[:,:])
 
     ut = np.real(fft_object_inv(data1))
@@ -92,7 +89,6 @@ def fps(nx, ny, dx, dy, f):
 
 #%%
 # set periodic boundary condition for ghost nodes. Index 0 and (n+2) are the ghost boundary locations
-@jit
 def bc(nx,ny,u):
     u[:,0] = u[:,ny]
     u[:,1] = u[:,ny+1]
@@ -153,7 +149,6 @@ def grad_spectral(nx,ny,u):
     return ux,uy
 
 #%%
-@jit
 def les_filter(nx,ny,nxc,nyc,u):
     
     '''
@@ -185,6 +180,90 @@ def les_filter(nx,ny,nxc,nyc,u):
     uc[nx,ny] = uc[0,0]
     
     return uc
+
+#%%
+def gaussian_filter_f(nx,ny,dx,dy,dxc,dyc,u):
+    
+    '''
+    coarsen the solution field keeping the size of the data same
+    
+    Inputs
+    ------
+    nx,ny : number of grid points in x and y direction on fine grid
+    nxc,nyc : number of grid points in x and y direction on coarse grid
+    u : solution field on fine grid
+    
+    Output
+    ------
+    uc : coarsened solution field [nx+1, ny+1]
+    '''
+    epsilon = 1.0e-6
+    
+    kx = np.fft.fftfreq(nx, d=dx)*(2.0*np.pi)
+    ky = np.fft.fftfreq(ny, d=dx)*(2.0*np.pi)
+    
+    kx[0] = epsilon
+    ky[0] = epsilon
+    
+    kx, ky = np.meshgrid(kx, ky, indexing='ij')
+    
+    uf = np.fft.fft2(u[0:nx,0:ny])
+    
+    df = 2.0*dxc
+    ufg = np.exp(-(kx**2 + ky**2)*df**2/24) * uf
+    
+    utc = np.real(np.fft.ifft2(ufg))
+    uc = np.zeros((nx+1,ny+1))
+    uc[0:nx,0:ny] = utc
+    
+    # periodic bc
+    uc[:,ny] = uc[:,0]
+    uc[nx,:] = uc[0,:]
+    uc[nx,ny] = uc[0,0]
+    
+    return uc    
+
+def coarsen(nx,ny,nxc,nyc,u):
+    
+    '''
+    coarsen the solution field along with the size of the data 
+    
+    Inputs
+    ------
+    nx,ny : number of grid points in x and y direction on fine grid
+    nxc,nyc : number of grid points in x and y direction on coarse grid
+    u : solution field on fine grid
+    
+    Output
+    ------
+    uc : solution field on coarse grid [nxc , nyc]
+    '''
+    
+    uf = np.fft.fft2(u[0:nx,0:ny])
+    
+    ufc = np.zeros((nxc,nyc),dtype='complex')
+    
+    ufc [0:int(nxc/2),0:int(nyc/2)] = uf[0:int(nxc/2),0:int(nyc/2)]     
+    ufc [int(nxc/2):,0:int(nyc/2)] = uf[int(nx-nxc/2):,0:int(nyc/2)] 
+    ufc [0:int(nxc/2),int(nyc/2):] = uf[0:int(nxc/2),int(ny-nyc/2):] 
+    ufc [int(nxc/2):,int(nyc/2):] =  uf[int(nx-nxc/2):,int(ny-nyc/2):] 
+    
+    ufc = ufc*(nxc*nyc)/(nx*ny)
+    
+    utc = np.real(np.fft.ifft2(ufc))
+    
+    uc = np.zeros((nxc+1,nyc+1))
+    uc[0:nxc,0:nyc] = utc
+    uc[:,nyc] = uc[:,0]
+    uc[nxc,:] = uc[0,:]
+    uc[nxc,nyc] = uc[0,0]
+        
+    return uc
+
+def gaussian_coarsen(nx,ny,nxc,nyc,dx,dy,dxc,dyc,u):
+    ug = gaussian_filter_f(nx,ny,dx,dy,dxc,dyc,u)
+    ugc = coarsen(nx,ny,nxc,nyc,ug) # change to [2:nx+3,2:ny+3] afterwards 
+    return ugc
 
 #%%  
 def dyn_smag(nx,ny,kappa,sc,wc):
@@ -390,6 +469,28 @@ def rhs_arakawa(nx,ny,dx,dy,re,w,s,ifm,kappa,max_min,model,ifeat):
                         
     return f
 
+def jacobian(nx,ny,dx,dy,re,w,s):
+    gg = 1.0/(4.0*dx*dy)
+    hh = 1.0/3.0
+    
+    # Arakawa
+    j1 = gg*( (w[3:nx+4,2:ny+3]-w[1:nx+2,2:ny+3])*(s[2:nx+3,3:ny+4]-s[2:nx+3,1:ny+2]) \
+             -(w[2:nx+3,3:ny+4]-w[2:nx+3,1:ny+2])*(s[3:nx+4,2:ny+3]-s[1:nx+2,2:ny+3]))
+
+    j2 = gg*( w[3:nx+4,2:ny+3]*(s[3:nx+4,3:ny+4]-s[3:nx+4,1:ny+2]) \
+            - w[1:nx+2,2:ny+3]*(s[1:nx+2,3:ny+4]-s[1:nx+2,1:ny+2]) \
+            - w[2:nx+3,3:ny+4]*(s[3:nx+4,3:ny+4]-s[1:nx+2,3:ny+4]) \
+            + w[2:nx+3,1:ny+2]*(s[3:nx+4,1:ny+2]-s[1:nx+2,1:ny+2]))
+
+    j3 = gg*( w[3:nx+4,3:ny+4]*(s[2:nx+3,3:ny+4]-s[3:nx+4,2:ny+3]) \
+            - w[1:nx+2,1:ny+2]*(s[1:nx+2,2:ny+3]-s[2:nx+3,1:ny+2]) \
+            - w[1:nx+2,3:ny+4]*(s[2:nx+3,3:ny+4]-s[1:nx+2,2:ny+3]) \
+            + w[3:nx+4,1:ny+2]*(s[3:nx+4,2:ny+3]-s[2:nx+3,1:ny+2]) )
+
+    jac = (j1+j2+j3)*hh
+    
+    return jac
+
 #%%
 # set initial condition for decay of turbulence problem
 def ic_decay(nx,ny,dx,dy):
@@ -460,7 +561,7 @@ def ic_decay(nx,ny,dx,dy):
 
 #%%
 # compute the energy spectrum numerically
-def energy_spectrum(nx,ny,w):
+def energy_spectrum(nx,ny,dx,dy,w):
     epsilon = 1.0e-6
 
     kx = np.empty(nx)
@@ -516,6 +617,29 @@ def coeff_determination(y_true, y_pred):
     SS_tot = K.sum(K.square( y_true - K.mean(y_true) ) )
     return ( 1 - SS_res/(SS_tot + K.epsilon()) )
 
+#%%
+def tdma(a,b,c,r,s,e):
+    
+    a_ = np.copy(a)
+    b_ = np.copy(b)
+    c_ = np.copy(c)
+    r_ = np.copy(r)
+    
+    un = np.zeros((np.shape(r)[0],np.shape(r)[1]))
+    
+    for i in range(s+1,e+1):
+        b_[i,:] = b_[i,:] - a_[i,:]*(c_[i-1,:]/b_[i-1,:])
+        r_[i,:] = r_[i,:] - a_[i,:]*(r_[i-1,:]/b_[i-1,:])
+        
+    un[e,:] = r_[e,:]/b_[e,:]
+    
+    for i in range(e-1,s-1,-1):
+        un[i,:] = (r_[i,:] - c_[i,:]*un[i+1,:])/b_[i,:]
+    
+    del a_, b_, c_, r_
+    
+    return un
+
 def tdmsv(a,b,c,r,s,e,n):
     gam = np.zeros((e+1,n+1))
     u = np.zeros((e+1,n+1))
@@ -545,10 +669,6 @@ def ctdmsv(a,b,c,alpha,beta,r,s,e,n):
     gamma[0,:] = -b[s,:]
     bb[s,:] = b[s,:] - gamma[0,:]
     bb[e,:] = b[e,:] - alpha*beta/gamma[0,:]
-    
-#    for i in range(s+1,e):
-#        bb[i] = b[i]
-    
     bb[s+1:e,:] = b[s+1:e,:]
     
     x = tdmsv(a,bb,c,r,s,e,n)
@@ -558,14 +678,11 @@ def ctdmsv(a,b,c,alpha,beta,r,s,e,n):
     
     z = tdmsv(a,bb,c,u,s,e,n)
     
-    fact = (x[s,:] + beta[0,:]*x[e,:]/gamma[0,:])/(1.0 + z[s,:] + beta[0,:]*z[e,:]/gamma[0,:])
-    
-#    for i in range(s,e+1):
-#        x[i] = x[i] - fact*z[i]
-    
+    fact = (x[s,:] + beta[0,:]*x[e,:]/gamma[0,:])/(1.0 + z[s,:] + beta[0,:]*z[e,:]/gamma[0,:])    
     x[s:e+1,:] = x[s:e+1,:] - fact*z[s:e+1,:]
         
     return x
+
 
 def c4d_p(f,dx,dy,nx,ny,isign):
     
@@ -592,7 +709,7 @@ def c4d_p(f,dx,dy,nx,ny,isign):
     r[ii,:] = 3.0*(up[(ii+1)%nx,:] - up[ii-1,:])/(4.0*h)
     
     start = 0
-    end = nx-1
+    end = nx
         
     alpha = np.zeros((1,ny+1))
     beta = np.zeros((1,ny+1))
@@ -600,7 +717,7 @@ def c4d_p(f,dx,dy,nx,ny,isign):
     alpha[0,:] = 1.0/4.0
     beta[0,:] = 1.0/4.0
     
-    x = ctdmsv(a,b,c,alpha,beta,r,start,end,ny)
+    x = ctdmsv(a,b,c,alpha,beta,r,start,end-1,ny)
     
     ud = np.zeros((nx+1,ny+1))
     ud[0:nx,:] = x[0:nx,:]
@@ -612,6 +729,13 @@ def c4d_p(f,dx,dy,nx,ny,isign):
         fd = np.copy(ud.T)
         
     return fd
+
+def compute_derivatives(f,dx,dy,nx,ny):
+    fx = c4d_p(f,dx,dy,nx,ny,'X')
+    fy = c4d_p(f,dx,dy,nx,ny,'Y')
+    
+    return fx, fy
+
 
 def compute_history(nx,ny,dx,dy,x,y,lx,ly,re,s,w):
     
@@ -631,10 +755,43 @@ def compute_history(nx,ny,dx,dy,x,y,lx,ly,re,s,w):
     
     # dissipation 
     dis = (2.0/re)*ens
-    
-    
     return ene, ens, dis
 
+def store_apriori_data(nx,ny,nxc,nyc,dx,dy,dxc,dyc,w,s,filename):
+    wc = np.zeros((nxc+5,nyc+5))
+    sc = np.zeros((nxc+5,nyc+5))
+    
+    wc[2:nxc+3,2:nyc+3] = gaussian_coarsen(nx,ny,nxc,nyc,dx,dy,dxc,dyc,w[2:nx+3,2:ny+3]) 
+    wc = bc(nxc,nyc,wc)
+    
+    sc[:,:] = fps(nxc,nyc,dxc,dyc,-wc)
+    sc = bc(nxc,nyc,sc)
+    
+    jac_f = jacobian(nx,ny,dx,dy,re,w,s)                    # Jacobian on fine resolution
+    jac_ff = gaussian_coarsen(nx,ny,nxc,nyc,dx,dy,dxc,dyc,jac_f)    # Filtered Jacobian on fine resolution
+    jac_c = jacobian(nxc,nyc,dxc,dyc,re,wc,sc)              # Jacobian on coarse resolution
+    
+    pi_source = jac_c - jac_ff
+    
+    wcx,wcy = compute_derivatives(wc[2:nxc+3,2:nyc+3],dxc,dyc,nxc,nyc)
+    wcxx,wcxy = compute_derivatives(wcx,dxc,dyc,nxc,nyc)
+    wcyx,wcyy = compute_derivatives(wcy,dxc,dyc,nxc,nyc)
+    scx,scy = compute_derivatives(sc[2:nxc+3,2:nyc+3],dxc,dyc,nxc,nyc)
+    scxx,scxy = compute_derivatives(scx,dxc,dyc,nxc,nyc)
+    scyx,scyy = compute_derivatives(scy,dxc,dyc,nxc,nyc)
+    
+    kernel_w = np.sqrt(wcx**2 + wcy**2)
+    kernel_s = np.sqrt(4.0*scxy**2 + (scxx - scyy)**2)
+    
+    lap = wcxx + wcyy
+    
+    nu_e = pi_source/lap
+    
+    np.savez(filename,wc=wc[2:nxc+3,2:nyc+3],sc=sc[2:nxc+3,2:nyc+3],
+             nue=nu_e,lap=lap,pi=pi_source,ks=kernel_s,kw=kernel_w,
+             wcx=wcx,wcy=wcy,wcxx=wcxx,wcyy=wcyy,wcxy=wcxy,
+             scx=scx,scy=scy,scxx=scxx,scyy=scyy,scxy=scxy)
+        
 def plot_turbulent_parameters(time,ene,ens,dis,filename):
     fig, ax = plt.subplots(2,2,figsize=(8,6))
     axs = ax.flat
@@ -680,6 +837,8 @@ file.close()
 
 nx = input_data['nx']
 ny = input_data['ny']
+nxc = input_data['nxc']
+nyc = input_data['nyc']
 re = float(input_data['re'])
 nt = input_data['nt']
 dt = input_data['dt']
@@ -707,7 +866,7 @@ directory = f'KT_{model_dict[str(ifm)]}'
 if not os.path.exists(directory):
     os.makedirs(directory)
 
-directory = os.path.join(directory, f'solution_{nx}_{ny}_{re:0.2e}')
+directory = os.path.join(directory, f'solution_{nx}_{nxc}_{re:0.2e}')
 if not os.path.exists(directory):
     os.makedirs(directory)
     
@@ -718,6 +877,11 @@ if not os.path.exists(directory_movie):
 directory_save = os.path.join(directory, f'save')
 if not os.path.exists(directory_save):
     os.makedirs(directory_save)
+
+directory_apriori = os.path.join(directory, f'apriori')
+if not os.path.exists(directory_apriori):
+    os.makedirs(directory_apriori)
+
      
 filename = os.path.join(directory, f"kt_stats_{nx}_{ny}_{re:0.2e}.txt")
 fstats = open(filename,"w+")
@@ -740,13 +904,19 @@ ly = 2.0*pi
 dx = lx/np.float64(nx)
 dy = ly/np.float64(ny)
 
+dxc = lx/np.float64(nxc)
+dyc = ly/np.float64(nyc)
+
 ifile = 0
 time = 0.0
 
 x = np.linspace(0.0,2.0*np.pi,nx+1)
 y = np.linspace(0.0,2.0*np.pi,ny+1)
-
 X, Y = np.meshgrid(x, y, indexing='ij')
+
+xc = np.linspace(0.0,2.0*np.pi,nxc+1)
+yc = np.linspace(0.0,2.0*np.pi,nyc+1)
+Xc, Yc = np.meshgrid(xc, yc, indexing='ij')
 
 #%% 
 # allocate the vorticity and streamfunction arrays
@@ -781,7 +951,7 @@ if print_log:
     sys.stdout = log
     
 mfreq = int(nt/nsmovie)
-km = input_data['mvchkp']
+km = input_data['mvchkp'] + 1
 
 if (ks % pfreq == 0):
     print('%0.5i %0.3f %0.3f %0.3f' % (ks, time[ks], np.max(wen[:,:,n]), np.min(wen[:,:,n])))
@@ -790,6 +960,9 @@ n = 0
 if ks == 0:
     filename = os.path.join(directory_save, f'ws_{ks}.npz')
     np.savez(filename,w = wen[:,:,n], s = sen[:,:,n])
+    
+    filename = os.path.join(directory_apriori, f'ws_{ks}.npz')
+    store_apriori_data(nx,ny,nxc,nyc,dx,dy,dxc,dyc,wen[:,:,n],sen[:,:,n],filename)
 
 if ks == 0:
     filename = os.path.join(directory_movie, f'ws_{km}.npz')
@@ -842,12 +1015,16 @@ for k in range(ks+1,nt+1):
                     
         if k % sfreq == 0:
             filename = os.path.join(directory_save, f'ws_{k}.npz')
-            np.savez(filename,w = wen[:,:,n], s = sen[:,:,n])
+            np.savez(filename,w = wen[:,:,n])
         
         if k % mfreq == 0:
             filename = os.path.join(directory_movie, f'ws_{km}.npz')
-            np.savez(filename, w = wen[:,:,n], s = sen[:,:,n]) 
+            np.savez(filename, w = wen[:,:,n]) 
             km = km + 1
+        
+        filename = os.path.join(directory_apriori, f'ws_{k}.npz')
+        store_apriori_data(nx,ny,nxc,nyc,dx,dy,dxc,dyc,wen[:,:,n],sen[:,:,n],filename)
+        
     
 total_clock_time = tm.time() - clock_time_init
 print('Total clock time=', total_clock_time)
@@ -882,38 +1059,71 @@ np.savez(filename, time=time, ene=ene, ens=ens, dis=dis)
 
 #%%
 wes_p = np.zeros((nx+5,ny+5,esplot+1))
+wes_p_c = np.zeros((nxc+5,nyc+5,esplot+1))
 espfreq = int(nt/esplot)
 for j in range(esplot+1):
     filename = os.path.join(directory_save, f'ws_{j*espfreq}.npz')
     data = np.load(filename)
     wes_p[:,:,j] =  data['w']
+    
+    filename = os.path.join(directory_apriori, f'ws_{j*espfreq}.npz')
+    data = np.load(filename)
+    wes_p_c[2:nxc+3,2:nyc+3,j] =  data['wc']
+    wes_p_c[:,:,j] = bc(nxc,nyc,wes_p_c[:,:,j])
 
+#%%    
 if (ipr == 4):
 
-    fig, ax = plt.subplots(1,1,figsize=(6,6))
+    fig, ax = plt.subplots(1,2,figsize=(12,6))
     
     for j in range(esplot+1):
-        en, n = energy_spectrum(nx,ny,wes_p[:,:,j])  
+        en, n = energy_spectrum(nx,ny,dx,dy,wes_p[:,:,j])  
         k = np.linspace(1,n,n)
         if j == 0:
-            ax.loglog(k,en[1:], 'k', lw = 2, alpha = 1.0, label=f'$t={j*dt*espfreq}$')
+            ax[0].loglog(k,en[1:], 'k', lw = 2, alpha = 1.0, label=f'$t={j*dt*espfreq}$')
         else:
-            ax.loglog(k,en[1:], lw = 2, alpha = 1.0, label=f'$t={j*dt*espfreq}$')
+            ax[0].loglog(k,en[1:], lw = 2, alpha = 1.0, label=f'$t={j*dt*espfreq}$')
     
     kl = np.linspace(8,int(n/2),int(n/2)-7)
     line = 100*kl**(-3.0)
     
-    ax.loglog(kl,line, 'k--', lw = 2, )
+    ax[0].loglog(kl,line, 'k--', lw = 2, )
+    ax[0].text(0.65, 0.95, '$k^{-3}$', transform=ax[0].transAxes, fontsize=16, fontweight='bold', va='top')
     
-    ax.text(0.65, 0.95, '$k^{-3}$', transform=ax.transAxes, fontsize=16, fontweight='bold', va='top')
-    
-    ax.set_xlabel('$K$')
-    ax.set_ylabel('$E(K)$')
-    ax.legend(loc=3)
-    ax.set_ylim(1e-8,1e0)
-    ax.set_title('Energy spectrum')
+    for j in range(esplot+1):
+        en, n = energy_spectrum(nxc,nyc,dxc,dyc,wes_p_c[:,:,j])  
+        k = np.linspace(1,n,n)
+        if j == 0:
+            ax[1].loglog(k,en[1:], 'k', lw = 2, alpha = 1.0, label=f'$t={j*dt*espfreq}$')
+        else:
+            ax[1].loglog(k,en[1:], lw = 2, alpha = 1.0, label=f'$t={j*dt*espfreq}$')
+            
+    for i in range(2):
+        ax[i].set_xlabel('$K$')
+        ax[i].set_ylabel('$E(K)$')
+        ax[i].legend(loc=3)
+        ax[i].set_ylim(1e-8,1e0)
+        ax[i].set_title('Energy spectrum')
         
     plt.show()
     filename = os.path.join(directory, f'es_{nx}_{ny}_{re:0.2e}.png')
     fig.savefig(filename, bbox_inches = 'tight', pad_inches = 0, dpi = 300)
 
+    fig, ax = plt.subplots(2,2,figsize=(12,12))
+    axs = ax.flat
+    for j in range(1,esplot+1):
+        en, n = energy_spectrum(nx,ny,dx,dy,wes_p[:,:,j])  
+        k = np.linspace(1,n,n)
+        axs[j-1].loglog(k,en[1:], lw = 2, alpha = 1.0, label=f'$t={j*dt*espfreq}$ DNS')
+        
+        en, n = energy_spectrum(nxc,nyc,dxc,dyc,wes_p_c[:,:,j])  
+        k = np.linspace(1,n,n)
+        axs[j-1].loglog(k,en[1:], lw = 2, alpha = 1.0, label=f'$t={j*dt*espfreq}$ FDNS')
+        
+        axs[j-1].set_xlabel('$K$')
+        axs[j-1].set_ylabel('$E(K)$')
+        axs[j-1].legend(loc=3)
+    
+    plt.show()
+    filename = os.path.join(directory, f'es_filtered_{nx}_{nxc}_{re:0.2e}.png')
+    fig.savefig(filename, bbox_inches = 'tight', pad_inches = 0, dpi = 300)

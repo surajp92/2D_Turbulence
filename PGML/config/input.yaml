@@ -1,8 +1,10 @@
 # parameters of the 2d homegeneous turbulence problem
-nx : 32         # NXF
-ny : 32         # NYF
+nx : 64         # NXF
+ny : 64         # NYF
+nxc : 32         # NXC
+nyc : 32         # NYC
 re : 2.0e3      # Re, Reynolds number 
-nt : 2600       # NT, number of time step
+nt : 4000       # NT, number of time step
 dt : 1.0e-3     # dt, time step
 isolver : 1     # isolver; [1]arakawa [2] Central-difference [3] compact
 icompact : 0    # [0] if non-compact [1] fourth-order, [2] sixth-order

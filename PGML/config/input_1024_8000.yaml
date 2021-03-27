@@ -1,6 +1,8 @@
 # parameters of the 2d homegeneous turbulence problem
 nx : 1024         # NXF
 ny : 1024         # NYF
+nxc : 128         # NXC
+nyc : 128         # NYC
 re : 8.0e3      # Re, Reynolds number 
 nt : 4000       # NT, number of time step
 dt : 1.0e-3     # dt, time step
@@ -11,11 +13,11 @@ ipr : 4         # [1]TGV, [2]VM, [3]Shear, [4]Decay
 ip : 1          # ipoisson; [1]FST [2] MG5
 its : 2         # its; [1]Euler [2] RK3
 pfreq : 1       # print frequency
-sfreq : 50       # save frequency
-nsmovie : 100   # number of snapshots for movie
+sfreq : 400       # save frequency
+nsmovie : 20   # number of snapshots for movie
 esplot : 4      # number of energy spectrum
 kappa : 2       # DSM parameter
 pCU3 : 0.0      # CU3 parameter
 ichkp : 0       # start from checkpoint
-nschkp : 2600   # snapshots to start from
+nschkp : 0   # snapshots to start from
 mvchkp : 0      # movie checkpoint
