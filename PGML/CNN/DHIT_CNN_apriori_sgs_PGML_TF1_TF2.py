@@ -7,11 +7,8 @@ Created on Sat May 25 14:51:02 2019
 
 import numpy as np
 import matplotlib.pyplot as plt
-from keras.models import Sequential, Model, load_model
-from keras.layers import Input, Conv2D, MaxPooling2D, UpSampling2D
-from keras.layers import concatenate
-from keras.utils import plot_model
-from keras import backend as K
+import argparse
+
 from scipy.interpolate import UnivariateSpline
 from scipy.stats import norm 
 from numpy.random import seed
@@ -19,13 +16,66 @@ seed(1)
 # from tensorflow import set_random_seed
 # set_random_seed(2)
 from utils import *
+import sys
+import yaml
 import os
 import time as tm
 import csv
 
-import os
+parser = argparse.ArgumentParser()
+parser.add_argument("config", nargs='?', default="cnn.txt", help="Config yaml file")
+parser.add_argument("tf_version", nargs='?', default=1, type=int, help="Tensorflow version")
+parser.add_argument("log", nargs='?', default=0, type=int, help="Write to a log file")
+args = parser.parse_args()
+config_file = args.config
+tf_version = args.tf_version
+print_log = args.log
 
-#import pydot
+l1 = []
+with open(config_file) as f:
+    for l in f:
+        l1.append((l.strip()).split("\t"))
+
+nxf, nyf = np.int64(l1[0][0]), np.int64(l1[0][0])
+nx, ny = np.int64(l1[1][0]), np.int64(l1[1][0])
+n_snapshots = np.int64(l1[2][0])
+n_snapshots_train = np.int64(l1[3][0])   
+n_snapshots_test = np.int64(l1[4][0])        
+freq = np.int64(l1[5][0])
+istencil = np.int64(l1[6][0])    # 1: nine point, 2: single point
+ifeatures = np.int64(l1[7][0])   # 1: 6 features, 2: 2 features 
+ilabel = np.int64(l1[8][0])      # 1: SGS (tau), 2: eddy-viscosity (nu)
+re = np.float64(l1[9][0]) 
+
+if tf_version == 1:
+    directory = f'nn_history/TF1_{nx}/'
+elif tf_version == 2:
+    directory = f'nn_history/TF2_{nx}/'
+    
+if not os.path.exists(directory):
+    os.makedirs(directory)
+    
+filename = os.path.join(directory, f"cnn_training.txt")
+log = open(filename, "w")
+        
+if print_log:
+    sys.stdout = log
+    
+if tf_version == 1:
+    from keras.models import Sequential, Model, load_model
+    from keras.layers import Input, Conv2D, MaxPooling2D, UpSampling2D
+    from keras.layers import concatenate
+    from keras.optimizers import adam
+    from keras.utils import plot_model
+    from keras import backend as K
+    
+elif tf_version == 2:
+    from tensorflow.keras.models import Sequential, Model, load_model
+    from tensorflow.keras.layers import Input, Conv2D, MaxPooling2D, UpSampling2D
+    from tensorflow.keras.layers import concatenate
+    from tensorflow.keras.optimizers import Adam as adam
+    from tensorflow.keras.utils import plot_model
+    from tensorflow.keras import backend as K
 
 #%%
 #Class of problem to solve 2D decaying homogeneous isotrpic turbulence
@@ -60,19 +110,23 @@ class DHIT:
         
         self.wc = np.zeros(shape=(self.n_snapshots, self.nx+1, self.ny+1), dtype='double')
         self.sc = np.zeros(shape=(self.n_snapshots, self.nx+1, self.ny+1), dtype='double')
-        self.kwc = np.zeros(shape=(self.n_snapshots, self.nx+1, self.ny+1), dtype='double')
-        self.ksc = np.zeros(shape=(self.n_snapshots, self.nx+1, self.ny+1), dtype='double')
+        
         self.pi = np.zeros(shape=(self.n_snapshots, self.nx+1, self.ny+1), dtype='double')
-        self.wcx = np.zeros(shape=(self.n_snapshots, self.nx+1, self.ny+1), dtype='double')
-        self.wcy = np.zeros(shape=(self.n_snapshots, self.nx+1, self.ny+1), dtype='double')
-        self.wcxx = np.zeros(shape=(self.n_snapshots, self.nx+1, self.ny+1), dtype='double')
-        self.wcyy = np.zeros(shape=(self.n_snapshots, self.nx+1, self.ny+1), dtype='double')
-        self.wcxy = np.zeros(shape=(self.n_snapshots, self.nx+1, self.ny+1), dtype='double')
-        self.scx = np.zeros(shape=(self.n_snapshots, self.nx+1, self.ny+1), dtype='double')
-        self.scy = np.zeros(shape=(self.n_snapshots, self.nx+1, self.ny+1), dtype='double')
-        self.scxx = np.zeros(shape=(self.n_snapshots, self.nx+1, self.ny+1), dtype='double')
-        self.scyy = np.zeros(shape=(self.n_snapshots, self.nx+1, self.ny+1), dtype='double')
-        self.scxy = np.zeros(shape=(self.n_snapshots, self.nx+1, self.ny+1), dtype='double')
+        
+        if self.ifeatures >= 2:
+            self.kwc = np.zeros(shape=(self.n_snapshots, self.nx+1, self.ny+1), dtype='double')
+            self.ksc = np.zeros(shape=(self.n_snapshots, self.nx+1, self.ny+1), dtype='double')
+            if self.ifeatures == 3:                
+                self.wcx = np.zeros(shape=(self.n_snapshots, self.nx+1, self.ny+1), dtype='double')
+                self.wcy = np.zeros(shape=(self.n_snapshots, self.nx+1, self.ny+1), dtype='double')
+                self.wcxx = np.zeros(shape=(self.n_snapshots, self.nx+1, self.ny+1), dtype='double')
+                self.wcyy = np.zeros(shape=(self.n_snapshots, self.nx+1, self.ny+1), dtype='double')
+                self.wcxy = np.zeros(shape=(self.n_snapshots, self.nx+1, self.ny+1), dtype='double')
+                self.scx = np.zeros(shape=(self.n_snapshots, self.nx+1, self.ny+1), dtype='double')
+                self.scy = np.zeros(shape=(self.n_snapshots, self.nx+1, self.ny+1), dtype='double')
+                self.scxx = np.zeros(shape=(self.n_snapshots, self.nx+1, self.ny+1), dtype='double')
+                self.scyy = np.zeros(shape=(self.n_snapshots, self.nx+1, self.ny+1), dtype='double')
+                self.scxy = np.zeros(shape=(self.n_snapshots, self.nx+1, self.ny+1), dtype='double')
         
         directory = f'../KT_DNS/solution_{nxf}_{nx}_{re:0.2e}/apriori'
         
@@ -82,19 +136,21 @@ class DHIT:
             data_input = np.load(file_input)
             self.wc[m-1,:,:] = data_input['wc']
             self.sc[m-1,:,:] = data_input['sc']
-            self.kwc[m-1,:,:] = data_input['kw']
-            self.ksc[m-1,:,:] = data_input['ks']
             self.pi[m-1,:,:] = data_input['pi']
-            self.wcx[m-1,:,:] = data_input['wcx']
-            self.wcy[m-1,:,:] = data_input['wcy']
-            self.wcxx[m-1,:,:] = data_input['wcxx']
-            self.wcyy[m-1,:,:] = data_input['wcyy']
-            self.wcxy[m-1,:,:] = data_input['wcxy']
-            self.scx[m-1,:,:] = data_input['scx']
-            self.scy[m-1,:,:] = data_input['scy']
-            self.scxx[m-1,:,:] = data_input['scxx']
-            self.scyy[m-1,:,:] = data_input['scyy']
-            self.scxy[m-1,:,:] = data_input['scxy']
+            if self.ifeatures >= 2:
+                self.kwc[m-1,:,:] = data_input['kw']
+                self.ksc[m-1,:,:] = data_input['ks']
+                if self.ifeatures == 3:         
+                    self.wcx[m-1,:,:] = data_input['wcx']
+                    self.wcy[m-1,:,:] = data_input['wcy']
+                    self.wcxx[m-1,:,:] = data_input['wcxx']
+                    self.wcyy[m-1,:,:] = data_input['wcyy']
+                    self.wcxy[m-1,:,:] = data_input['wcxy']
+                    self.scx[m-1,:,:] = data_input['scx']
+                    self.scy[m-1,:,:] = data_input['scy']
+                    self.scxx[m-1,:,:] = data_input['scxx']
+                    self.scyy[m-1,:,:] = data_input['scyy']
+                    self.scxy[m-1,:,:] = data_input['scxy']
         
         self.scale_data()
         
@@ -109,39 +165,45 @@ class DHIT:
         '''
         self.max_min[0,0], self.max_min[0,1] = np.max(self.wc), np.min(self.wc)
         self.max_min[1,0], self.max_min[1,1] = np.max(self.sc), np.min(self.sc)
-        self.max_min[2,0], self.max_min[2,1] = np.max(self.kwc), np.min(self.kwc)
-        self.max_min[3,0], self.max_min[3,1] = np.max(self.ksc), np.min(self.ksc)
         
-        self.max_min[4,0], self.max_min[4,1] = np.max(self.wcx), np.min(self.wcx)
-        self.max_min[5,0], self.max_min[5,1] = np.max(self.wcy), np.min(self.wcy)
-        self.max_min[6,0], self.max_min[6,1] = np.max(self.wcxx), np.min(self.wcxx)
-        self.max_min[7,0], self.max_min[7,1] = np.max(self.wcyy), np.min(self.wcyy)
-        self.max_min[8,0], self.max_min[8,1] = np.max(self.wcxy), np.min(self.wcxy)
-        
-        self.max_min[9,0], self.max_min[9,1] = np.max(self.scx), np.min(self.scx)
-        self.max_min[10,0], self.max_min[10,1] = np.max(self.scy), np.min(self.scy)
-        self.max_min[11,0], self.max_min[11,1] = np.max(self.scxx), np.min(self.scxx)
-        self.max_min[12,0], self.max_min[12,1] = np.max(self.scyy), np.min(self.scyy)
-        self.max_min[13,0], self.max_min[13,1] = np.max(self.scxy), np.min(self.scxy)
+        if self.ifeatures >= 2:
+            self.max_min[2,0], self.max_min[2,1] = np.max(self.kwc), np.min(self.kwc)
+            self.max_min[3,0], self.max_min[3,1] = np.max(self.ksc), np.min(self.ksc)
+            
+            if self.ifeatures == 3:
+                self.max_min[4,0], self.max_min[4,1] = np.max(self.wcx), np.min(self.wcx)
+                self.max_min[5,0], self.max_min[5,1] = np.max(self.wcy), np.min(self.wcy)
+                self.max_min[6,0], self.max_min[6,1] = np.max(self.wcxx), np.min(self.wcxx)
+                self.max_min[7,0], self.max_min[7,1] = np.max(self.wcyy), np.min(self.wcyy)
+                self.max_min[8,0], self.max_min[8,1] = np.max(self.wcxy), np.min(self.wcxy)
+                
+                self.max_min[9,0], self.max_min[9,1] = np.max(self.scx), np.min(self.scx)
+                self.max_min[10,0], self.max_min[10,1] = np.max(self.scy), np.min(self.scy)
+                self.max_min[11,0], self.max_min[11,1] = np.max(self.scxx), np.min(self.scxx)
+                self.max_min[12,0], self.max_min[12,1] = np.max(self.scyy), np.min(self.scyy)
+                self.max_min[13,0], self.max_min[13,1] = np.max(self.scxy), np.min(self.scxy)
         
         self.max_min[14,0], self.max_min[14,1] = np.max(self.pi), np.min(self.pi)
         
         self.wc = (2.0*self.wc - (np.max(self.wc) + np.min(self.wc)))/(np.max(self.wc) - np.min(self.wc))
         self.sc = (2.0*self.sc - (np.max(self.sc) + np.min(self.sc)))/(np.max(self.sc) - np.min(self.sc))
-        self.kwc = (2.0*self.kwc - (np.max(self.kwc) + np.min(self.kwc)))/(np.max(self.kwc) - np.min(self.kwc))
-        self.ksc = (2.0*self.ksc - (np.max(self.ksc) + np.min(self.ksc)))/(np.max(self.ksc) - np.min(self.ksc))
         
-        self.wcx = (2.0*self.wcx - (np.max(self.wcx) + np.min(self.wcx)))/(np.max(self.wcx) - np.min(self.wcx))
-        self.wcy = (2.0*self.wcy - (np.max(self.wcy) + np.min(self.wcy)))/(np.max(self.wcy) - np.min(self.wcy))
-        self.wcxx = (2.0*self.wcxx - (np.max(self.wcxx) + np.min(self.wcxx)))/(np.max(self.wcxx) - np.min(self.wcxx))
-        self.wcyy = (2.0*self.wcyy - (np.max(self.wcyy) + np.min(self.wcyy)))/(np.max(self.wcyy) - np.min(self.wcyy))
-        self.wcxy = (2.0*self.wcxy - (np.max(self.wcxy) + np.min(self.wcxy)))/(np.max(self.wcxy) - np.min(self.wcxy))
-        
-        self.scx = (2.0*self.scx - (np.max(self.scx) + np.min(self.scx)))/(np.max(self.scx) - np.min(self.scx))
-        self.scy = (2.0*self.scy - (np.max(self.scy) + np.min(self.scy)))/(np.max(self.scy) - np.min(self.scy))
-        self.scxx = (2.0*self.scxx - (np.max(self.scxx) + np.min(self.scxx)))/(np.max(self.scxx) - np.min(self.scxx))
-        self.scyy = (2.0*self.scyy - (np.max(self.scyy) + np.min(self.scyy)))/(np.max(self.scyy) - np.min(self.scyy))
-        self.scxy = (2.0*self.scxy - (np.max(self.scxy) + np.min(self.scxy)))/(np.max(self.scxy) - np.min(self.scxy))
+        if self.ifeatures >= 2:
+            self.kwc = (2.0*self.kwc - (np.max(self.kwc) + np.min(self.kwc)))/(np.max(self.kwc) - np.min(self.kwc))
+            self.ksc = (2.0*self.ksc - (np.max(self.ksc) + np.min(self.ksc)))/(np.max(self.ksc) - np.min(self.ksc))
+            
+            if self.ifeatures == 3:
+                self.wcx = (2.0*self.wcx - (np.max(self.wcx) + np.min(self.wcx)))/(np.max(self.wcx) - np.min(self.wcx))
+                self.wcy = (2.0*self.wcy - (np.max(self.wcy) + np.min(self.wcy)))/(np.max(self.wcy) - np.min(self.wcy))
+                self.wcxx = (2.0*self.wcxx - (np.max(self.wcxx) + np.min(self.wcxx)))/(np.max(self.wcxx) - np.min(self.wcxx))
+                self.wcyy = (2.0*self.wcyy - (np.max(self.wcyy) + np.min(self.wcyy)))/(np.max(self.wcyy) - np.min(self.wcyy))
+                self.wcxy = (2.0*self.wcxy - (np.max(self.wcxy) + np.min(self.wcxy)))/(np.max(self.wcxy) - np.min(self.wcxy))
+                
+                self.scx = (2.0*self.scx - (np.max(self.scx) + np.min(self.scx)))/(np.max(self.scx) - np.min(self.scx))
+                self.scy = (2.0*self.scy - (np.max(self.scy) + np.min(self.scy)))/(np.max(self.scy) - np.min(self.scy))
+                self.scxx = (2.0*self.scxx - (np.max(self.scxx) + np.min(self.scxx)))/(np.max(self.scxx) - np.min(self.scxx))
+                self.scyy = (2.0*self.scyy - (np.max(self.scyy) + np.min(self.scyy)))/(np.max(self.scyy) - np.min(self.scyy))
+                self.scxy = (2.0*self.scxy - (np.max(self.scxy) + np.min(self.scxy)))/(np.max(self.scxy) - np.min(self.scxy))
         
         self.pi = (2.0*self.pi - (np.max(self.pi) + np.min(self.pi)))/(np.max(self.pi) - np.min(self.pi))
         
@@ -346,7 +408,7 @@ class CNN:
         model = Model(inputs=[field, kernels], outputs=sgs)
         return model
 
-    def CNN_compile(self,optimizer):
+    def CNN_compile(self,optimizer,lr):
         
         '''
         compile the CNN model
@@ -357,7 +419,10 @@ class CNN:
 
         '''
         
-        self.model.compile(loss='mean_squared_error', optimizer=optimizer,metrics=[self.coeff_determination])
+        opt = adam(lr=lr)
+        self.model.compile(loss='mean_squared_error', 
+                           optimizer=opt,
+                           metrics=[self.coeff_determination])
         
     def CNN_train(self,epochs,batch_size):
         
@@ -489,22 +554,6 @@ class CNN:
         
 #%%
 # generate training and testing data for CNN
-l1 = []
-with open('cnn.txt') as f:
-    for l in f:
-        l1.append((l.strip()).split("\t"))
-
-nxf, nyf = np.int64(l1[0][0]), np.int64(l1[0][0])
-nx, ny = np.int64(l1[1][0]), np.int64(l1[1][0])
-n_snapshots = np.int64(l1[2][0])
-n_snapshots_train = np.int64(l1[3][0])   
-n_snapshots_test = np.int64(l1[4][0])        
-freq = np.int64(l1[5][0])
-istencil = np.int64(l1[6][0])    # 1: nine point, 2: single point
-ifeatures = np.int64(l1[7][0])   # 1: 6 features, 2: 2 features 
-ilabel = np.int64(l1[8][0])      # 1: SGS (tau), 2: eddy-viscosity (nu)
-re = np.float64(l1[9][0]) 
-
 obj = DHIT(nx=nx,ny=ny,nxf=nxf,nyf=nyf,re=re,freq=freq,n_snapshots=n_snapshots,n_snapshots_train=n_snapshots_train, 
            n_snapshots_test=n_snapshots_test,istencil=istencil,ifeatures=ifeatures,ilabel=ilabel)
 
@@ -526,24 +575,23 @@ _, _, _, nco = y_train_sc.shape
 # train the CNN model and predict for the test data
 model = CNN(x_train_sc_f,x_train_sc_k,y_train_sc,nx_train,ny_train,ncf,nck,nco)
 model.CNN_info()
-model.CNN_compile(optimizer='adam')
+model.CNN_compile(optimizer='adam',lr=0.0001)
 
 #%%
 training_time_init = tm.time()
-history_callback = model.CNN_train(epochs=800,batch_size=32)
+history_callback = model.CNN_train(epochs=5,batch_size=32)
 total_training_time = tm.time() - training_time_init
 
 loss, val_loss, mse, val_mse = model.CNN_history(history_callback)
-
-#%%
-directory = f'nn_history/TF1/'
-if not os.path.exists(directory):
-    os.makedirs(directory)
-    
+   
 nn_history(loss, val_loss, mse, val_mse, istencil, ifeatures, n_snapshots_train, directory)
 
 #%%
-filename = os.path.join(directory, f'CNN_model_{ifeatures}.hd5')    
+if tf_version == 1:
+    filename = os.path.join(directory, f'CNN_model_{ifeatures}')    
+elif tf_version == 2:
+    filename = os.path.join(directory, f'CNN_model_{ifeatures}')   
+    
 model.CNN_save(filename)
 filename = os.path.join(directory, f'scaling.npy')
 np.save(filename,max_min)
@@ -559,32 +607,33 @@ with open(filename, 'a', newline='') as myfile:
      wr.writerow(['CNN',istencil, ifeatures, n_snapshots_train, total_training_time, t1, t2, t3])
 
 #%% unscale the predicted data
-y_test = np.zeros(shape=(1, nx+1, ny+1, 3), dtype='double')
-y_pred = np.zeros(shape=(1, nx+1, ny+1, 3), dtype='double')
-
-#%%
 if ilabel == 1:
+    y_test = np.zeros(shape=(1, nx+1, ny+1, 1), dtype='double') 
+    y_pred = np.zeros(shape=(1, nx+1, ny+1, 1), dtype='double')
     for i in range(1):
         y_pred[0,:,:,i] = 0.5*(y_pred_sc[0,:,:,i]*(max_min[-1,0] - max_min[-1,1]) + (max_min[-1,0] + max_min[-1,1]))
         y_test[0,:,:,i] = 0.5*(y_test_sc[0,:,:,i]*(max_min[-1,0] - max_min[-1,1]) + (max_min[-1,0] + max_min[-1,1]))    
 
 elif ilabel == 2:
+    y_test = np.zeros(shape=(1, nx+1, ny+1, 3), dtype='double') 
+    y_pred = np.zeros(shape=(1, nx+1, ny+1, 3), dtype='double')
     for i in range(3):
         y_pred[0,:,:,i] = 0.5*(y_pred_sc[0,:,:,i]*(max_min[i+13,0] - max_min[i+13,1]) + (max_min[i+13,0] + max_min[i+13,1]))
         y_test[0,:,:,i] = 0.5*(y_test_sc[0,:,:,i]*(max_min[i+13,0] - max_min[i+13,1]) + (max_min[i+13,0] + max_min[i+13,1]))   
 
-nn = 2        
-export_results(y_test[0], y_pred[0],  ilabel, istencil, ifeatures, n_snapshots_train, nxf, nx, nn, directory)
-
-
+if ilabel == 1:
+    filename = os.path.join(directory, f'y_sgs_{istencil}_{ifeatures}_{n_snapshots_train}_{ilabel}.npz')
+    np.savez(filename, y_test=y_test, y_pred=y_pred)
+if ilabel == 2:
+    filename = os.path.join(directory, f'y_sgs_{istencil}_{ifeatures}_{n_snapshots_train}_{ilabel}.npz')
+    np.savez(filename, y_test=y_test, y_pred=y_pred)
+    
 #%%
 if ilabel == 1:
     num_bins = 64
     
     fig, axs = plt.subplots(1,1,figsize=(6,4))
     axs.set_yscale('log')
-
-    
     # the histogram of the data
     axs.hist(y_test[0,:,:,0].flatten(), num_bins, histtype='step', alpha=1, color='r',zorder=5,
                linewidth=2.0,range=(-4*np.std(y_test[0,:,:,0]),4*np.std(y_test[0,:,:,0])),density=True,label="True")
@@ -605,7 +654,7 @@ if ilabel == 1:
     plt.figlegend( line_labels,  loc = 'lower center', borderaxespad=0.3, ncol=3, labelspacing=0.,  prop={'size': 13} )
     plt.show()
     
-    filename = os.path.join(directory, f'ts_cnn_{istencil}_{ifeatures}_{n_snapshots_train}.png')    
+    filename = os.path.join(directory, f'pi_cnn_{istencil}_{ifeatures}_{n_snapshots_train}.png')    
     fig.savefig(filename, bbox_inches = 'tight', dpi=200)
     
     

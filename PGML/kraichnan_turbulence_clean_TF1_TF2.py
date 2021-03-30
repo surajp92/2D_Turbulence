@@ -8,7 +8,6 @@ Created on Sat Sep 26 14:16:04 2020
 
 import numpy as np
 from numpy.random import seed
-seed(1)
 import pyfftw
 from scipy import integrate
 from scipy import linalg
@@ -19,16 +18,37 @@ import os
 from numba import jit
 from scipy import ndimage
 
-from tensorflow.keras.models import Sequential, Model, load_model
-from tensorflow.keras.layers import Input, Conv2D, MaxPooling2D, UpSampling2D
-from tensorflow.keras import backend as K
-
 from scipy.ndimage import gaussian_filter
 import yaml
 import sys
 import argparse
 from scipy.integrate import simps
 
+parser = argparse.ArgumentParser()
+parser.add_argument("config", nargs='?', default="config/input.yaml", help="Config yaml file")
+parser.add_argument("tf_version", nargs='?', default=1, type=int, help="Tensorflow version")
+parser.add_argument("log", nargs='?', default=0, type=int, help="Write to a log file")
+args = parser.parse_args()
+config_file = args.config
+tf_version = args.tf_version
+print_log = args.log
+
+if tf_version == 1:
+    from keras.models import Sequential, Model, load_model
+    from keras.layers import Input, Conv2D, MaxPooling2D, UpSampling2D
+    from keras.layers import concatenate
+    from keras.optimizers import adam
+    from keras.utils import plot_model
+    from keras import backend as K
+    
+elif tf_version == 2:
+    from tensorflow.keras.models import Sequential, Model, load_model
+    from tensorflow.keras.layers import Input, Conv2D, MaxPooling2D, UpSampling2D
+    from tensorflow.keras.layers import concatenate
+    from tensorflow.keras.optimizers import Adam as adam
+    from tensorflow.keras.utils import plot_model
+    from tensorflow.keras import backend as K
+    
 #from utils import *
 
 #font = {'family' : 'Times New Roman',
@@ -476,7 +496,7 @@ def jacobian(nx,ny,dx,dy,re,w,s):
     hh = 1.0/3.0
     
     # Arakawa
-    j1 = gg*( (w[3:nx+4,2:ny+3]-w[1:nx+2,2:ny+3])*(s[2:nx+3,3:ny+4]-s[2:nx+3,1:ny+2]) \
+    j1 = gg*((w[3:nx+4,2:ny+3]-w[1:nx+2,2:ny+3])*(s[2:nx+3,3:ny+4]-s[2:nx+3,1:ny+2]) \
              -(w[2:nx+3,3:ny+4]-w[2:nx+3,1:ny+2])*(s[3:nx+4,2:ny+3]-s[1:nx+2,2:ny+3]))
 
     j2 = gg*( w[3:nx+4,2:ny+3]*(s[3:nx+4,3:ny+4]-s[3:nx+4,1:ny+2]) \
@@ -823,16 +843,8 @@ def plot_contour(X,Y,w,s,filename):
     fig.tight_layout()
     fig.savefig(filename, bbox_inches = 'tight', pad_inches = 0.1, dpi = 200)
     
-#%% 
-parser = argparse.ArgumentParser()
-parser.add_argument("config", nargs='?', default="config/input.yaml", help="Config yaml file")
-parser.add_argument("log", nargs='?', default=0, type=int, help="Write to a log file")
-args = parser.parse_args()
-config_file = args.config
-print_log = args.log
-    
+#%%   
 with open(config_file) as file:
-#with open('config/input.yaml') as file:    
     input_data = yaml.load(file, Loader=yaml.FullLoader)
     
 file.close()        
@@ -859,7 +871,11 @@ pCU3 = input_data['pCU3']
 ichkp = input_data['ichkp']
 nschkp = input_data['nschkp']
 iapriori = input_data['iapriori']
+iaprsfreq = input_data['iaprsfreq']
 imovie = input_data['imovie']
+seedn = input_data['seedn']
+
+seed(seedn)
 
 model_dict = {}
 model_dict[str(0)] = 'DNS'
@@ -870,7 +886,7 @@ directory = f'KT_{model_dict[str(ifm)]}'
 if not os.path.exists(directory):
     os.makedirs(directory)
 
-directory = os.path.join(directory, f'solution_{nx}_{nxc}_{re:0.2e}')
+directory = os.path.join(directory, f'solution_{nx}_{nxc}_{re:0.2e}_{seedn}')
 if not os.path.exists(directory):
     os.makedirs(directory)
     
@@ -897,9 +913,10 @@ if ifm == 0:
     model = None
     max_min = None
 else:
-    model = load_model(f'./CNN/nn_history/TF2/CNN_model_{ifeat}',
-                   custom_objects={'coeff_determination': coeff_determination})
-    max_min = np.load('./CNN/nn_history/TF2/scaling.npy')
+    model = load_model(f'./CNN/nn_history/TF{tf_version}_{nx}/CNN_model_{ifeat}',
+                           custom_objects={'coeff_determination': coeff_determination})
+        
+    max_min = np.load(f'./CNN/nn_history/TF{tf_version}_{nx}/scaling.npy')
 
 #%% 
 # DA parameters
@@ -1032,9 +1049,10 @@ for k in range(ks+1,nt+1):
                 np.savez(filename, w = wen[:,:,n]) 
                 km = km + 1
         
-        if iapriori == 1:
-            filename = os.path.join(directory_apriori, f'ws_{k}.npz')
-            store_apriori_data(nx,ny,nxc,nyc,dx,dy,dxc,dyc,wen[:,:,n],sen[:,:,n],filename)
+        if k % iaprsfreq == 0:
+            if iapriori == 1:
+                filename = os.path.join(directory_apriori, f'ws_{k}.npz')
+                store_apriori_data(nx,ny,nxc,nyc,dx,dy,dxc,dyc,wen[:,:,n],sen[:,:,n],filename)
         
     
 total_clock_time = tm.time() - clock_time_init

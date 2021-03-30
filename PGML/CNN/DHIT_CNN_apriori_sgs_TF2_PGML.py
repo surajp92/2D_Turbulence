@@ -60,19 +60,23 @@ class DHIT:
         
         self.wc = np.zeros(shape=(self.n_snapshots, self.nx+1, self.ny+1), dtype='double')
         self.sc = np.zeros(shape=(self.n_snapshots, self.nx+1, self.ny+1), dtype='double')
-        self.kwc = np.zeros(shape=(self.n_snapshots, self.nx+1, self.ny+1), dtype='double')
-        self.ksc = np.zeros(shape=(self.n_snapshots, self.nx+1, self.ny+1), dtype='double')
+        
         self.pi = np.zeros(shape=(self.n_snapshots, self.nx+1, self.ny+1), dtype='double')
-        self.wcx = np.zeros(shape=(self.n_snapshots, self.nx+1, self.ny+1), dtype='double')
-        self.wcy = np.zeros(shape=(self.n_snapshots, self.nx+1, self.ny+1), dtype='double')
-        self.wcxx = np.zeros(shape=(self.n_snapshots, self.nx+1, self.ny+1), dtype='double')
-        self.wcyy = np.zeros(shape=(self.n_snapshots, self.nx+1, self.ny+1), dtype='double')
-        self.wcxy = np.zeros(shape=(self.n_snapshots, self.nx+1, self.ny+1), dtype='double')
-        self.scx = np.zeros(shape=(self.n_snapshots, self.nx+1, self.ny+1), dtype='double')
-        self.scy = np.zeros(shape=(self.n_snapshots, self.nx+1, self.ny+1), dtype='double')
-        self.scxx = np.zeros(shape=(self.n_snapshots, self.nx+1, self.ny+1), dtype='double')
-        self.scyy = np.zeros(shape=(self.n_snapshots, self.nx+1, self.ny+1), dtype='double')
-        self.scxy = np.zeros(shape=(self.n_snapshots, self.nx+1, self.ny+1), dtype='double')
+        
+        if self.ifeatures >= 2:
+            self.kwc = np.zeros(shape=(self.n_snapshots, self.nx+1, self.ny+1), dtype='double')
+            self.ksc = np.zeros(shape=(self.n_snapshots, self.nx+1, self.ny+1), dtype='double')
+            if self.ifeatures == 3:                
+                self.wcx = np.zeros(shape=(self.n_snapshots, self.nx+1, self.ny+1), dtype='double')
+                self.wcy = np.zeros(shape=(self.n_snapshots, self.nx+1, self.ny+1), dtype='double')
+                self.wcxx = np.zeros(shape=(self.n_snapshots, self.nx+1, self.ny+1), dtype='double')
+                self.wcyy = np.zeros(shape=(self.n_snapshots, self.nx+1, self.ny+1), dtype='double')
+                self.wcxy = np.zeros(shape=(self.n_snapshots, self.nx+1, self.ny+1), dtype='double')
+                self.scx = np.zeros(shape=(self.n_snapshots, self.nx+1, self.ny+1), dtype='double')
+                self.scy = np.zeros(shape=(self.n_snapshots, self.nx+1, self.ny+1), dtype='double')
+                self.scxx = np.zeros(shape=(self.n_snapshots, self.nx+1, self.ny+1), dtype='double')
+                self.scyy = np.zeros(shape=(self.n_snapshots, self.nx+1, self.ny+1), dtype='double')
+                self.scxy = np.zeros(shape=(self.n_snapshots, self.nx+1, self.ny+1), dtype='double')
         
         directory = f'../KT_DNS/solution_{nxf}_{nx}_{re:0.2e}/apriori'
         
@@ -82,19 +86,21 @@ class DHIT:
             data_input = np.load(file_input)
             self.wc[m-1,:,:] = data_input['wc']
             self.sc[m-1,:,:] = data_input['sc']
-            self.kwc[m-1,:,:] = data_input['kw']
-            self.ksc[m-1,:,:] = data_input['ks']
             self.pi[m-1,:,:] = data_input['pi']
-            self.wcx[m-1,:,:] = data_input['wcx']
-            self.wcy[m-1,:,:] = data_input['wcy']
-            self.wcxx[m-1,:,:] = data_input['wcxx']
-            self.wcyy[m-1,:,:] = data_input['wcyy']
-            self.wcxy[m-1,:,:] = data_input['wcxy']
-            self.scx[m-1,:,:] = data_input['scx']
-            self.scy[m-1,:,:] = data_input['scy']
-            self.scxx[m-1,:,:] = data_input['scxx']
-            self.scyy[m-1,:,:] = data_input['scyy']
-            self.scxy[m-1,:,:] = data_input['scxy']
+            if self.ifeatures >= 2:
+                self.kwc[m-1,:,:] = data_input['kw']
+                self.ksc[m-1,:,:] = data_input['ks']
+                if self.ifeatures == 3:         
+                    self.wcx[m-1,:,:] = data_input['wcx']
+                    self.wcy[m-1,:,:] = data_input['wcy']
+                    self.wcxx[m-1,:,:] = data_input['wcxx']
+                    self.wcyy[m-1,:,:] = data_input['wcyy']
+                    self.wcxy[m-1,:,:] = data_input['wcxy']
+                    self.scx[m-1,:,:] = data_input['scx']
+                    self.scy[m-1,:,:] = data_input['scy']
+                    self.scxx[m-1,:,:] = data_input['scxx']
+                    self.scyy[m-1,:,:] = data_input['scyy']
+                    self.scxy[m-1,:,:] = data_input['scxy']
         
         self.scale_data()
         
@@ -109,39 +115,44 @@ class DHIT:
         '''
         self.max_min[0,0], self.max_min[0,1] = np.max(self.wc), np.min(self.wc)
         self.max_min[1,0], self.max_min[1,1] = np.max(self.sc), np.min(self.sc)
-        self.max_min[2,0], self.max_min[2,1] = np.max(self.kwc), np.min(self.kwc)
-        self.max_min[3,0], self.max_min[3,1] = np.max(self.ksc), np.min(self.ksc)
         
-        self.max_min[4,0], self.max_min[4,1] = np.max(self.wcx), np.min(self.wcx)
-        self.max_min[5,0], self.max_min[5,1] = np.max(self.wcy), np.min(self.wcy)
-        self.max_min[6,0], self.max_min[6,1] = np.max(self.wcxx), np.min(self.wcxx)
-        self.max_min[7,0], self.max_min[7,1] = np.max(self.wcyy), np.min(self.wcyy)
-        self.max_min[8,0], self.max_min[8,1] = np.max(self.wcxy), np.min(self.wcxy)
-        
-        self.max_min[9,0], self.max_min[9,1] = np.max(self.scx), np.min(self.scx)
-        self.max_min[10,0], self.max_min[10,1] = np.max(self.scy), np.min(self.scy)
-        self.max_min[11,0], self.max_min[11,1] = np.max(self.scxx), np.min(self.scxx)
-        self.max_min[12,0], self.max_min[12,1] = np.max(self.scyy), np.min(self.scyy)
-        self.max_min[13,0], self.max_min[13,1] = np.max(self.scxy), np.min(self.scxy)
+        if self.ifeatures >= 2:
+            self.max_min[2,0], self.max_min[2,1] = np.max(self.kwc), np.min(self.kwc)
+            self.max_min[3,0], self.max_min[3,1] = np.max(self.ksc), np.min(self.ksc)
+            
+            if self.ifeatures == 3:
+                self.max_min[4,0], self.max_min[4,1] = np.max(self.wcx), np.min(self.wcx)
+                self.max_min[5,0], self.max_min[5,1] = np.max(self.wcy), np.min(self.wcy)
+                self.max_min[6,0], self.max_min[6,1] = np.max(self.wcxx), np.min(self.wcxx)
+                self.max_min[7,0], self.max_min[7,1] = np.max(self.wcyy), np.min(self.wcyy)
+                self.max_min[8,0], self.max_min[8,1] = np.max(self.wcxy), np.min(self.wcxy)
+                
+                self.max_min[9,0], self.max_min[9,1] = np.max(self.scx), np.min(self.scx)
+                self.max_min[10,0], self.max_min[10,1] = np.max(self.scy), np.min(self.scy)
+                self.max_min[11,0], self.max_min[11,1] = np.max(self.scxx), np.min(self.scxx)
+                self.max_min[12,0], self.max_min[12,1] = np.max(self.scyy), np.min(self.scyy)
+                self.max_min[13,0], self.max_min[13,1] = np.max(self.scxy), np.min(self.scxy)
         
         self.max_min[14,0], self.max_min[14,1] = np.max(self.pi), np.min(self.pi)
         
         self.wc = (2.0*self.wc - (np.max(self.wc) + np.min(self.wc)))/(np.max(self.wc) - np.min(self.wc))
         self.sc = (2.0*self.sc - (np.max(self.sc) + np.min(self.sc)))/(np.max(self.sc) - np.min(self.sc))
-        self.kwc = (2.0*self.kwc - (np.max(self.kwc) + np.min(self.kwc)))/(np.max(self.kwc) - np.min(self.kwc))
-        self.ksc = (2.0*self.ksc - (np.max(self.ksc) + np.min(self.ksc)))/(np.max(self.ksc) - np.min(self.ksc))
         
-        self.wcx = (2.0*self.wcx - (np.max(self.wcx) + np.min(self.wcx)))/(np.max(self.wcx) - np.min(self.wcx))
-        self.wcy = (2.0*self.wcy - (np.max(self.wcy) + np.min(self.wcy)))/(np.max(self.wcy) - np.min(self.wcy))
-        self.wcxx = (2.0*self.wcxx - (np.max(self.wcxx) + np.min(self.wcxx)))/(np.max(self.wcxx) - np.min(self.wcxx))
-        self.wcyy = (2.0*self.wcyy - (np.max(self.wcyy) + np.min(self.wcyy)))/(np.max(self.wcyy) - np.min(self.wcyy))
-        self.wcxy = (2.0*self.wcxy - (np.max(self.wcxy) + np.min(self.wcxy)))/(np.max(self.wcxy) - np.min(self.wcxy))
-        
-        self.scx = (2.0*self.scx - (np.max(self.scx) + np.min(self.scx)))/(np.max(self.scx) - np.min(self.scx))
-        self.scy = (2.0*self.scy - (np.max(self.scy) + np.min(self.scy)))/(np.max(self.scy) - np.min(self.scy))
-        self.scxx = (2.0*self.scxx - (np.max(self.scxx) + np.min(self.scxx)))/(np.max(self.scxx) - np.min(self.scxx))
-        self.scyy = (2.0*self.scyy - (np.max(self.scyy) + np.min(self.scyy)))/(np.max(self.scyy) - np.min(self.scyy))
-        self.scxy = (2.0*self.scxy - (np.max(self.scxy) + np.min(self.scxy)))/(np.max(self.scxy) - np.min(self.scxy))
+        if self.ifeatures >= 2:
+            self.kwc = (2.0*self.kwc - (np.max(self.kwc) + np.min(self.kwc)))/(np.max(self.kwc) - np.min(self.kwc))
+            self.ksc = (2.0*self.ksc - (np.max(self.ksc) + np.min(self.ksc)))/(np.max(self.ksc) - np.min(self.ksc))
+            if self.ifeatures == 3:
+                self.wcx = (2.0*self.wcx - (np.max(self.wcx) + np.min(self.wcx)))/(np.max(self.wcx) - np.min(self.wcx))
+                self.wcy = (2.0*self.wcy - (np.max(self.wcy) + np.min(self.wcy)))/(np.max(self.wcy) - np.min(self.wcy))
+                self.wcxx = (2.0*self.wcxx - (np.max(self.wcxx) + np.min(self.wcxx)))/(np.max(self.wcxx) - np.min(self.wcxx))
+                self.wcyy = (2.0*self.wcyy - (np.max(self.wcyy) + np.min(self.wcyy)))/(np.max(self.wcyy) - np.min(self.wcyy))
+                self.wcxy = (2.0*self.wcxy - (np.max(self.wcxy) + np.min(self.wcxy)))/(np.max(self.wcxy) - np.min(self.wcxy))
+                
+                self.scx = (2.0*self.scx - (np.max(self.scx) + np.min(self.scx)))/(np.max(self.scx) - np.min(self.scx))
+                self.scy = (2.0*self.scy - (np.max(self.scy) + np.min(self.scy)))/(np.max(self.scy) - np.min(self.scy))
+                self.scxx = (2.0*self.scxx - (np.max(self.scxx) + np.min(self.scxx)))/(np.max(self.scxx) - np.min(self.scxx))
+                self.scyy = (2.0*self.scyy - (np.max(self.scyy) + np.min(self.scyy)))/(np.max(self.scyy) - np.min(self.scyy))
+                self.scxy = (2.0*self.scxy - (np.max(self.scxy) + np.min(self.scxy)))/(np.max(self.scxy) - np.min(self.scxy))
         
         self.pi = (2.0*self.pi - (np.max(self.pi) + np.min(self.pi)))/(np.max(self.pi) - np.min(self.pi))
         
@@ -530,13 +541,13 @@ model.CNN_compile(optimizer='adam')
 
 #%%
 training_time_init = tm.time()
-history_callback = model.CNN_train(epochs=800,batch_size=32)
+history_callback = model.CNN_train(epochs=5,batch_size=512)
 total_training_time = tm.time() - training_time_init
 
 loss, val_loss, mse, val_mse = model.CNN_history(history_callback)
 
 #%%
-directory = f'nn_history/TF2/'
+directory = f'nn_history/TF2_{nx}/'
 if not os.path.exists(directory):
     os.makedirs(directory)
     
