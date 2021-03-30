@@ -741,7 +741,7 @@ def rhs_compact(nx,ny,dx,dy,re,w,s):
     return f
 
 #%%
-def export_results(y_test, y_pred, ilabel, istencil, ifeatures, n_snapshots_train, nxf, nx, nn):
+def export_results(y_test, y_pred, ilabel, istencil, ifeatures, n_snapshots_train, nxf, nx, nn, directory):
     '''
     export the test data and ML predicted results
     
@@ -757,7 +757,7 @@ def export_results(y_test, y_pred, ilabel, istencil, ifeatures, n_snapshots_trai
     '''
 
     if nn == 1:
-        folder = "nn_history/"
+        folder = directory
         if ilabel == 1:
             filename = folder+"/y_test_sgs_"+str(istencil)+"_"+str(ifeatures)+"_"+str(n_snapshots_train)+".csv"
             np.savetxt(filename, y_test, delimiter=",")
@@ -773,7 +773,7 @@ def export_results(y_test, y_pred, ilabel, istencil, ifeatures, n_snapshots_trai
             np.savetxt(filename, y_pred, delimiter=",")
             
     elif nn == 2:
-        folder = "nn_history/"
+        folder = directory
         y_t = np.zeros((y_test.shape[0]*y_test.shape[1],y_test.shape[2]))
         y_p = np.zeros((y_pred.shape[0]*y_pred.shape[1],y_pred.shape[2]))
         for i in range(3):
@@ -795,7 +795,7 @@ def export_results(y_test, y_pred, ilabel, istencil, ifeatures, n_snapshots_trai
             np.savetxt(filename, y_p[:,0], delimiter=",")
 
 #%%
-def nn_history(loss, val_loss, mse, val_mse, istencil, ifeatures, n_snapshots_train):
+def nn_history(loss, val_loss, mse, val_mse, istencil, ifeatures, n_snapshots_train, directory):
     
     epochs = range(1, len(loss) + 1)
     
@@ -807,7 +807,8 @@ def nn_history(loss, val_loss, mse, val_mse, istencil, ifeatures, n_snapshots_tr
     history[:,3] = mse
     history[:,4] = val_mse
     
-    np.savetxt('nn_history/history_'+str(istencil)+"_"+str(ifeatures)+"_"+str(n_snapshots_train)+'.csv', history, delimiter=",")
+    filename = os.path.join(directory, f'history_{istencil}_{ifeatures}_{n_snapshots_train}.csv')
+    np.savetxt(filename, history, delimiter=",")
     
     fig, axs = plt.subplots(1,2,figsize=(9,4))
     axs[0].semilogy(epochs, loss, 'b', label='Training loss')
@@ -822,4 +823,5 @@ def nn_history(loss, val_loss, mse, val_mse, istencil, ifeatures, n_snapshots_tr
     
     fig.tight_layout()
     plt.show()
-    fig.savefig('nn_history/loss_mse_'+str(istencil)+"_"+str(ifeatures)+"_"+str(n_snapshots_train)+'.pdf')
+    filename = os.path.join(directory, f'loss_mse_{istencil}_{ifeatures}_{n_snapshots_train}.png')
+    fig.savefig(filename, dpi=200)

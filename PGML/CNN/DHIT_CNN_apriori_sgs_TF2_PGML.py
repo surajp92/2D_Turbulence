@@ -9,6 +9,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from tensorflow.keras.models import Sequential, Model, load_model
 from tensorflow.keras.layers import Input, Conv2D, MaxPooling2D, UpSampling2D
+from tensorflow.keras.layers import concatenate
 from tensorflow.keras.utils import plot_model
 from tensorflow.keras import backend as K
 from scipy.interpolate import UnivariateSpline
@@ -195,6 +196,7 @@ class DHIT:
                 y_train[m-1,:,:,1] = self.t12[m-1]
                 y_train[m-1,:,:,2] = self.t22[m-1]
             
+        
         return x_train, y_train
     
     def gen_test_data(self):
@@ -247,7 +249,7 @@ class DHIT:
 #%%
 #A Convolutional Neural Network class
 class CNN:
-    def __init__(self,x_train,y_train,nx,ny,nci,nco):
+    def __init__(self,x_train_f,x_train_k,y_train,nx,ny,ncf,nck,nco):
         
         '''
         initialize the CNN class
@@ -261,20 +263,23 @@ class CNN:
         nco : number of output labels
         '''
         
-        self.x_train = x_train
+        self.x_train_f = x_train_f
+        self.x_train_k = x_train_k
         self.y_train = y_train
         self.nx = nx
         self.ny = ny
-        self.nci = nci
+        self.ncf = ncf
+        self.nck = nck
         self.nco = nco
-        self.model = self.CNN(x_train,y_train,nx,ny,nci,nco)
+        # self.model = self.CNN()
+        self.model = self.CNN_PGML()
     
     def coeff_determination(self,y_true, y_pred):
         SS_res =  K.sum(K.square( y_true-y_pred ))
         SS_tot = K.sum(K.square( y_true - K.mean(y_true) ) )
         return ( 1 - SS_res/(SS_tot + K.epsilon()) )
         
-    def CNN(self,x_train,y_train,nx,ny,nci,nco):
+    def CNN(self):
         
         '''
         define CNN model
@@ -293,7 +298,7 @@ class CNN:
         '''
         
         model = Sequential()
-        input_img = Input(shape=(self.nx,self.ny,self.nci))
+        input_img = Input(shape=(self.nx,self.ny,self.ncf))
         
         x = Conv2D(16, (4, 4), activation='relu', padding='same')(input_img)
         x = Conv2D(16, (4, 4), activation='relu', padding='same')(x)
@@ -303,24 +308,42 @@ class CNN:
         x = Conv2D(16, (4, 4), activation='relu', padding='same')(x)
         decoded = Conv2D(nco, (4, 4), activation='linear', padding='same')(x)
         
-#        x = Conv2D(16, (3, 3), activation='relu', padding='same')(input_img)
-#        x = MaxPooling2D((2, 2), padding='same')(x)
-#        x = Conv2D(8, (3, 3), activation='relu', padding='same')(x)
-#        x = MaxPooling2D((2, 2), padding='same')(x)
-#        x = Conv2D(8, (3, 3), activation='relu', padding='same')(x)
-#        encoded = MaxPooling2D((2, 2), padding='same')(x)
-#        
-#        # at this point the representation is (4, 4, 8) i.e. 128-dimensional
-#
-#        x = Conv2D(8, (3, 3), activation='relu', padding='same')(encoded)
-#        x = UpSampling2D((2, 2))(x)
-#        x = Conv2D(8, (3, 3), activation='relu', padding='same')(x)
-#        x = UpSampling2D((2, 2))(x)
-#        x = Conv2D(16, (3, 3), activation='relu')(x)
-#        x = UpSampling2D((2,2))(x)
-#        decoded = Conv2D(nco, (3, 3), activation='linear', padding='same')(x)
-        
         model = Model(input_img, decoded)
+        return model
+    
+    def CNN_PGML(self):
+        
+        '''
+        define CNN model
+        
+        Inputs
+        ------
+        ue : output labels
+        f : input features (snapshot images)
+        nx,ny : snapshot images shape
+        nci: number of input features
+        nco: number of labels
+        
+        Output
+        ------
+        model: CNN model with defined activation function, number of layers
+        '''
+               
+        field = Input(shape=(self.nx,self.ny,self.ncf))
+        kernels = Input(shape=(self.nx,self.ny,self.nck))
+        
+        x = Conv2D(16, (4, 4), activation='relu', padding='same')(field)
+        x = Conv2D(16, (4, 4), activation='relu', padding='same')(x)
+        x = Conv2D(16, (4, 4), activation='relu', padding='same')(x)
+        x = Conv2D(16, (4, 4), activation='relu', padding='same')(x)
+        
+        x = concatenate(inputs=[x, kernels])
+        
+        x = Conv2D(16, (4, 4), activation='relu', padding='same')(x)
+        x = Conv2D(16, (4, 4), activation='relu', padding='same')(x)
+        sgs = Conv2D(nco, (4, 4), activation='linear', padding='same')(x)
+        
+        model = Model(inputs=[field, kernels], outputs=sgs)
         return model
 
     def CNN_compile(self,optimizer):
@@ -351,7 +374,9 @@ class CNN:
         history_callback: return the loss history of CNN model training
         '''
         
-        history_callback = self.model.fit(self.x_train,self.y_train,epochs=epochs,batch_size=batch_size, 
+        history_callback = self.model.fit(x = [self.x_train_f,self.x_train_k], 
+                                          y = self.y_train,
+                                          epochs=epochs,batch_size=batch_size, 
                                           validation_split= 0.2,)
         return history_callback
     
@@ -377,7 +402,7 @@ class CNN:
                
         return loss, val_loss, mse, val_mse
             
-    def CNN_predict(self,ftest):
+    def CNN_predict(self,x_test_sc_f,x_test_sc_k):
         
         '''
         predict the label for input features
@@ -392,17 +417,17 @@ class CNN:
         '''
 
         testing_time_init1 = tm.time()
-        y_test = self.model.predict(ftest)
+        y_test = self.model.predict(x=[x_test_sc_f,x_test_sc_k])
         t1 = tm.time() - testing_time_init1
         
         testing_time_init2 = tm.time()
-        y_test = self.model.predict(ftest)
+        y_test = self.model.predict(x=[x_test_sc_f,x_test_sc_k])
         #y_test = custom_model.predict(x_test)
         t2 = tm.time() - testing_time_init2
         
         testing_time_init3 = tm.time()
-        y_test = self.model.predict(ftest)
-        y_test = self.model.predict(ftest)
+        y_test = self.model.predict(x=[x_test_sc_f,x_test_sc_k])
+        y_test = self.model.predict(x=[x_test_sc_f,x_test_sc_k])
         t3 = tm.time() - testing_time_init3
         
         return y_test,t1,t2,t3
@@ -449,7 +474,7 @@ class CNN:
         '''
         
         self.model.summary()
-        #plot_model(self.model, to_file='cnn_model.png')
+        # plot_model(self.model, to_file='cnn_model.png', show_shapes=True)
         
     def CNN_save(self,model_name):
         
@@ -488,12 +513,18 @@ max_min = obj.max_min
 x_train_sc,y_train_sc = obj.x_train,obj.y_train
 x_test_sc,y_test_sc = obj.x_test,obj.y_test
 
-nt,nx_train,ny_train,nci = x_train_sc.shape
-nt,nx_train,ny_train,nco = y_train_sc.shape 
+x_train_sc_f = x_train_sc[:,:,:,:2]
+x_train_sc_k = x_train_sc[:,:,:,2:]
+x_test_sc_f = x_test_sc[:,:,:,:2]
+x_test_sc_k = x_test_sc[:,:,:,2:]
+
+nt, nx_train, ny_train, ncf = x_train_sc_f.shape
+_, _, _, nck = x_train_sc_k.shape
+_, _, _, nco = y_train_sc.shape 
 
 #%%
 # train the CNN model and predict for the test data
-model = CNN(x_train_sc,y_train_sc,nx_train,ny_train,nci,nco)
+model = CNN(x_train_sc_f,x_train_sc_k,y_train_sc,nx_train,ny_train,ncf,nck,nco)
 model.CNN_info()
 model.CNN_compile(optimizer='adam')
 
@@ -505,11 +536,11 @@ total_training_time = tm.time() - training_time_init
 loss, val_loss, mse, val_mse = model.CNN_history(history_callback)
 
 #%%
-directory = f'nn_history'
+directory = f'nn_history/TF2/'
 if not os.path.exists(directory):
     os.makedirs(directory)
     
-nn_history(loss, val_loss, mse, val_mse, istencil, ifeatures, n_snapshots_train)
+nn_history(loss, val_loss, mse, val_mse, istencil, ifeatures, n_snapshots_train, directory)
 
 #%%
 filename = os.path.join(directory, f'CNN_model_{ifeatures}')    
@@ -518,11 +549,12 @@ filename = os.path.join(directory, f'scaling.npy')
 np.save(filename,max_min)
 
 #testing_time_init = tm.time()
-y_pred_sc, t1, t2, t3 = model.CNN_predict(x_test_sc)
+y_pred_sc, t1, t2, t3 = model.CNN_predict(x_test_sc_f,x_test_sc_k)
 
 #total_testing_time = tm.time() - testing_time_init
 
-with open('cpu_time.csv', 'a', newline='') as myfile:
+filename = os.path.join(directory, 'cpu_time.csv') 
+with open(filename, 'a', newline='') as myfile:
      wr = csv.writer(myfile, quoting=csv.QUOTE_ALL)
      wr.writerow(['CNN',istencil, ifeatures, n_snapshots_train, total_training_time, t1, t2, t3])
 
@@ -540,8 +572,9 @@ elif ilabel == 2:
     for i in range(3):
         y_pred[0,:,:,i] = 0.5*(y_pred_sc[0,:,:,i]*(max_min[i+13,0] - max_min[i+13,1]) + (max_min[i+13,0] + max_min[i+13,1]))
         y_test[0,:,:,i] = 0.5*(y_test_sc[0,:,:,i]*(max_min[i+13,0] - max_min[i+13,1]) + (max_min[i+13,0] + max_min[i+13,1]))   
-        
-export_results(y_test[0], y_pred[0],  ilabel, istencil, ifeatures, n_snapshots_train, nxf, nx, nn=2)
+
+nn = 2        
+export_results(y_test[0], y_pred[0],  ilabel, istencil, ifeatures, n_snapshots_train, nxf, nx, nn, directory)
 
 
 #%%
@@ -572,7 +605,8 @@ if ilabel == 1:
     plt.figlegend( line_labels,  loc = 'lower center', borderaxespad=0.3, ncol=3, labelspacing=0.,  prop={'size': 13} )
     plt.show()
     
-    fig.savefig('nn_history/ts_cnn_'+str(istencil)+'_'+str(ifeatures)+'_'+str(n_snapshots_train)+'.pdf', bbox_inches = 'tight')
+    filename = os.path.join(directory, f'ts_cnn_{istencil}_{ifeatures}_{n_snapshots_train}.png')    
+    fig.savefig(filename, bbox_inches = 'tight', dpi=200)
     
     
 elif ilabel == 2:
@@ -650,19 +684,20 @@ elif ilabel == 2:
     plt.figlegend( line_labels,  loc = 'lower center', borderaxespad=0.3, ncol=3, labelspacing=0.,  prop={'size': 13} )
     plt.show()
     
-    fig.savefig('nn_history/ts_cnn_'+str(istencil)+'_'+str(ifeatures)+'_'+str(n_snapshots_train)+'.pdf', bbox_inches = 'tight')
+    filename = os.path.join(directory, f'ts_cnn_{istencil}_{ifeatures}_{n_snapshots_train}.png')    
+    fig.savefig(filename, bbox_inches = 'tight', dpi=200)
 
 
 #%%
 # contour plot of shear stresses
 fig, axs = plt.subplots(1,2,sharey=True,figsize=(11,5))
 
-cbarticks = np.arange(-200,250,50)
+cbarticks = np.arange(-50,60,10)
 
-cs = axs[0].contourf(y_test[0,:,:,0].T, cbarticks, cmap = 'jet', vmin=-200, vmax=200, )
+cs = axs[0].contourf(y_test[0,:,:,0].T, cbarticks, cmap = 'jet',  )
 axs[0].text(0.4, -0.1, 'True', transform=axs[0].transAxes, fontsize=14, va='top')
 
-cs = axs[1].contourf(y_pred[0,:,:,0].T, cbarticks, cmap = 'jet', vmin=-200, vmax=200, )
+cs = axs[1].contourf(y_pred[0,:,:,0].T, cbarticks, cmap = 'jet', )
 axs[1].text(0.4, -0.1, 'CNN', transform=axs[1].transAxes, fontsize=14, va='top')
 fig.tight_layout() 
 
@@ -672,24 +707,37 @@ fig.subplots_adjust(bottom=0.15)
 cbar_ax = fig.add_axes([0.22, -0.05, 0.6, 0.04])
 fig.colorbar(cs, cax=cbar_ax, ticks=cbarticks, orientation='horizontal')
 plt.show()
-fig.savefig('nn_history/contour_'+str(istencil)+'_'+str(ifeatures)+'_'+str(n_snapshots_train)+'.pdf', bbox_inches = 'tight')
+
+filename = filename = os.path.join(directory, f'contour_{istencil}_{ifeatures}_{n_snapshots_train}.png')    
+fig.savefig(filename, bbox_inches = 'tight', dpi=200)
 
 #%%
 def coeff_determination(y_true, y_pred):
     SS_res =  K.sum(K.square( y_true-y_pred ))
     SS_tot = K.sum(K.square( y_true - K.mean(y_true) ) )
     return ( 1 - SS_res/(SS_tot + K.epsilon()) )
-
+    
 #%%
-model = Sequential()
-input_img = Input(shape=(128,128,4))
+# nx = 128
+# ny = 128
+# n_field = 2
+# n_kernels = 2
+# nco = 1
 
-x = Conv2D(16, (4, 4), activation='relu', padding='same')(input_img)
-x = Conv2D(16, (4, 4), activation='relu', padding='same')(x)
-encoded = Conv2D(16, (4, 4), activation='relu', padding='same')(x)
-x = Conv2D(16, (4, 4), activation='relu', padding='same')(encoded)
-x = Conv2D(16, (4, 4), activation='relu', padding='same')(x)
-x = Conv2D(16, (4, 4), activation='relu', padding='same')(x)
-decoded = Conv2D(nco, (4, 4), activation='linear', padding='same')(x)
+# model = Sequential()
 
-model = Model(input_img, decoded)    
+# field = Input(shape=(nx,ny,n_field))
+# kernels = Input(shape=(nx,ny,n_kernels))
+
+# x = Conv2D(16, (4, 4), activation='relu', padding='same')(field)
+# x = Conv2D(16, (4, 4), activation='relu', padding='same')(x)
+# x = Conv2D(16, (4, 4), activation='relu', padding='same')(x)
+# x = Conv2D(16, (4, 4), activation='relu', padding='same')(x)
+
+# x = concatenate(inputs=[x, kernels])
+
+# x = Conv2D(16, (4, 4), activation='relu', padding='same')(x)
+# x = Conv2D(16, (4, 4), activation='relu', padding='same')(x)
+# sgs = Conv2D(nco, (4, 4), activation='linear', padding='same')(x)
+
+# model = Model(inputs=[field, kernels], outputs=sgs)

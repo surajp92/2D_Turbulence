@@ -19,9 +19,9 @@ import os
 from numba import jit
 from scipy import ndimage
 
-from keras.models import Sequential, Model, load_model
-from keras.layers import Input, Conv2D, MaxPooling2D, UpSampling2D
-from keras import backend as K
+from tensorflow.keras.models import Sequential, Model, load_model
+from tensorflow.keras.layers import Input, Conv2D, MaxPooling2D, UpSampling2D
+from tensorflow.keras import backend as K
 
 from scipy.ndimage import gaussian_filter
 import yaml
@@ -452,8 +452,7 @@ def rhs_arakawa(nx,ny,dx,dy,re,w,s,ifm,kappa,max_min,model,ifeat):
         pi_source = cnn_closure(nx,ny,w,s,max_min,model,ifeat)
         nue = pi_source/lap
         
-        nue_p = nue
-        # nue_p = np.where(nue > 0, nue, 0.0)
+        nue_p = np.where(nue > 0, nue, 0.0)
         
 #        nue_loc_avg = ndimage.generic_filter(nue_p, np.nanmean, size=3, mode='constant', cval=np.NaN)
 #        nue_loc_avg = ndimage.generic_filter(nue_p, np.mean, size=3, mode='constant', cval=0.0)
@@ -891,7 +890,9 @@ if not os.path.exists(directory_apriori):
 filename = os.path.join(directory, f"kt_stats_{nx}_{ny}_{re:0.2e}.txt")
 fstats = open(filename,"w+")
 
+
 ifeat = 2
+
 if ifm == 0:
     model = None
     max_min = None
