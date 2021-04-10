@@ -61,41 +61,81 @@ elif tf_version == 2:
 
 #%%
 # fast poisson solver using second-order central difference scheme
+# def fps(nx, ny, dx, dy, f):
+#     epsilon = 1.0e-6
+#     aa = -2.0/(dx*dx) - 2.0/(dy*dy)
+#     bb = 2.0/(dx*dx)
+#     cc = 2.0/(dy*dy)
+#     hx = 2.0*np.pi/np.float64(nx)
+#     hy = 2.0*np.pi/np.float64(ny)
+    
+#     kx = np.empty(nx)
+#     ky = np.empty(ny)
+    
+#     kx[:] = hx*np.float64(np.arange(0, nx))
+
+#     ky[:] = hy*np.float64(np.arange(0, ny))
+    
+#     kx[0] = epsilon
+#     ky[0] = epsilon
+
+#     kx, ky = np.meshgrid(np.cos(kx), np.cos(ky), indexing='ij')
+    
+#     data = np.empty((nx,ny), dtype='complex128')
+#     data1 = np.empty((nx,ny), dtype='complex128')
+    
+#     data[:,:] = np.vectorize(complex)(f[2:nx+2,2:ny+2],0.0)
+
+#     a = pyfftw.empty_aligned((nx,ny),dtype= 'complex128')
+#     b = pyfftw.empty_aligned((nx,ny),dtype= 'complex128')
+    
+#     fft_object = pyfftw.FFTW(a, b, axes = (0,1), direction = 'FFTW_FORWARD')
+#     fft_object_inv = pyfftw.FFTW(a, b,axes = (0,1), direction = 'FFTW_BACKWARD')
+    
+#     e = fft_object(data)
+#     e[0,0] = 0.0
+#     data1[:,:] = e[:,:]/(aa + bb*kx[:,:] + cc*ky[:,:])
+
+#     ut = np.real(fft_object_inv(data1))
+    
+#     #periodicity
+#     u = np.empty((nx+5,ny+5)) 
+#     u[2:nx+2,2:ny+2] = ut
+#     u[:,ny+2] = u[:,2]
+#     u[nx+2,:] = u[2,:]
+#     u[nx+2,ny+2] = u[2,2]
+    
+#     return u
+
 def fps(nx, ny, dx, dy, f):
     epsilon = 1.0e-6
-    aa = -2.0/(dx*dx) - 2.0/(dy*dy)
-    bb = 2.0/(dx*dx)
-    cc = 2.0/(dy*dy)
-    hx = 2.0*np.pi/np.float64(nx)
-    hy = 2.0*np.pi/np.float64(ny)
     
-    kx = np.empty(nx)
-    ky = np.empty(ny)
-    
-    kx[:] = hx*np.float64(np.arange(0, nx))
-
-    ky[:] = hy*np.float64(np.arange(0, ny))
+    kx = np.fft.fftfreq(nx, d=dx)*(2.0*np.pi)
+    ky = np.fft.fftfreq(ny, d=dx)*(2.0*np.pi)
     
     kx[0] = epsilon
     ky[0] = epsilon
-
-    kx, ky = np.meshgrid(np.cos(kx), np.cos(ky), indexing='ij')
     
     data = np.empty((nx,ny), dtype='complex128')
     data1 = np.empty((nx,ny), dtype='complex128')
-    
+        
     data[:,:] = np.vectorize(complex)(f[2:nx+2,2:ny+2],0.0)
-
+    
     a = pyfftw.empty_aligned((nx,ny),dtype= 'complex128')
     b = pyfftw.empty_aligned((nx,ny),dtype= 'complex128')
     
     fft_object = pyfftw.FFTW(a, b, axes = (0,1), direction = 'FFTW_FORWARD')
     fft_object_inv = pyfftw.FFTW(a, b,axes = (0,1), direction = 'FFTW_BACKWARD')
     
+    # compute the fourier transform
     e = fft_object(data)
+    
     e[0,0] = 0.0
-    data1[:,:] = e[:,:]/(aa + bb*kx[:,:] + cc*ky[:,:])
-
+    
+    kx, ky = np.meshgrid(kx, ky, indexing='ij')
+    data1 = e/(-kx**2 - ky**2)
+    
+    # compute the inverse fourier transform
     ut = np.real(fft_object_inv(data1))
     
     #periodicity
@@ -367,6 +407,87 @@ def stat_smag(nx,ny,dx,dy,s,cs):
     return ev    
 
 #%%
+def dnn_closure(nx,ny,w,s,max_min,model,ifeat):
+    wx,wy = grad_spectral(nx,ny,w[2:nx+3,2:ny+3])
+    wxx,wxy = grad_spectral(nx,ny,wx)
+    wyx,wyy = grad_spectral(nx,ny,wy)
+    
+    sx,sy = grad_spectral(nx,ny,s[2:nx+3,2:ny+3])
+    sxx,sxy = grad_spectral(nx,ny,sx)
+    syx,syy = grad_spectral(nx,ny,sy)
+    
+    kernel_w = np.sqrt(wx**2 + wy**2)
+    kernel_s = np.sqrt(4.0*sxy**2 + (sxx - syy)**2)
+        
+    wc = (2.0*w[2:nx+3,2:ny+3] - (max_min[0,0] + max_min[0,1]))/(max_min[0,0] - max_min[0,1])
+    sc = (2.0*s[2:nx+3,2:ny+3] - (max_min[1,0] + max_min[1,1]))/(max_min[1,0] - max_min[1,1])
+    kwc = (2.0*kernel_w - (max_min[2,0] + max_min[2,1]))/(max_min[2,0] - max_min[2,1])
+    ksc = (2.0*kernel_s - (max_min[3,0] + max_min[3,1]))/(max_min[3,0] - max_min[3,1])
+    
+    if ifeat == 3:
+        wcx = (2.0*wx - (max_min[4,0] + max_min[4,1]))/(max_min[4,0] - max_min[4,1])
+        wcy = (2.0*wy - (max_min[5,0] + max_min[5,1]))/(max_min[5,0] - max_min[5,1])
+        wcxx = (2.0*wxx - (max_min[6,0] + max_min[6,1]))/(max_min[6,0] - max_min[6,1])
+        wcyy = (2.0*wyy - (max_min[7,0] + max_min[7,1]))/(max_min[7,0] - max_min[7,1])
+        wcxy = (2.0*wxy - (max_min[8,0] + max_min[8,1]))/(max_min[8,0] - max_min[8,1])
+        
+        scx = (2.0*sx - (max_min[9,0] + max_min[9,1]))/(max_min[9,0] - max_min[9,1])
+        scy = (2.0*sy - (max_min[10,0] + max_min[10,1]))/(max_min[10,0] - max_min[10,1])
+        scxx = (2.0*sxx - (max_min[11,0] + max_min[11,1]))/(max_min[11,0] - max_min[11,1])
+        scyy = (2.0*syy - (max_min[12,0] + max_min[12,1]))/(max_min[12,0] - max_min[12,1])
+        scxy = (2.0*sxy - (max_min[13,0] + max_min[13,1]))/(max_min[13,0] - max_min[13,1])
+
+    if ifeat == 1:
+        nt = int((nx+1)*(ny+1))
+        x_test = np.zeros((nt,18))
+        n = 0
+        for i in range(2,nx+3):
+            for j in range(2,ny+3):
+                x_test[n,0:9] = w[i-1:i+2,j-1:j+2].flatten()
+                x_test[n,9:18] = s[i-1:i+2,j-1:j+2].flatten()
+                n = n+1         
+    if ifeat == 2:
+        nt = int((nx+1)*(ny+1))
+        x_test = np.zeros((nt,20))
+        n = 0
+        kw = np.zeros((nx+5,ny+5))
+        ks = np.zeros((nx+5,ny+5))
+        kw[2:nx+3,2:ny+3] = kwc
+        ks[2:nx+3,2:ny+3] = ksc
+        for i in range(2,nx+3):
+            for j in range(2,ny+3):
+                x_test[n,0:9] = w[i-1:i+2,j-1:j+2].flatten()
+                x_test[n,9:18] = s[i-1:i+2,j-1:j+2].flatten()
+                x_test[n,18] = kw[i,j]
+                x_test[n,19] = ks[i,j]
+    if ifeat == 3:
+        nt = int((nx+1)*(ny+1))
+        x_test = np.zeros((nt,108))
+        n = 0
+        for i in range(2,nx+3):
+            for j in range(2,ny+3):
+                x_test[n,0:9] = wc[i-1:i+2,j-1:j+2].flatten()
+                x_test[n,9:18] = sc[i-1:i+2,j-1:j+2].flatten()
+                x_test[n,18:27] = wcx[i-1:i+2,j-1:j+2].flatten()
+                x_test[n,27:36] = wcy[i-1:i+2,j-1:j+2].flatten()
+                x_test[n,36:45] = wcxx[i-1:i+2,j-1:j+2].flatten()
+                x_test[n,45:54] = wcyy[i-1:i+2,j-1:j+2].flatten()
+                x_test[n,54:63] = wcxy[i-1:i+2,j-1:j+2].flatten()
+                x_test[n,63:72] = scx[i-1:i+2,j-1:j+2].flatten()
+                x_test[n,72:81] = scy[i-1:i+2,j-1:j+2].flatten()
+                x_test[n,81:90] = scxx[i-1:i+2,j-1:j+2].flatten()
+                x_test[n,90:99] = scyy[i-1:i+2,j-1:j+2].flatten()
+                x_test[n,99:108] = scxy[i-1:i+2,j-1:j+2].flatten()
+                n = n+1
+                
+    y_pred_sc = model.predict(x_test)
+    y_pred = 0.5*(y_pred_sc*(max_min[14,0] - max_min[14,1]) + (max_min[14,0] + max_min[14,1]))
+    
+    y_pred = np.reshape(y_pred,[nx+1,ny+1])
+    
+    return y_pred  
+
+#%%
 def cnn_closure(nx,ny,w,s,max_min,model,ifeat):
     wx,wy = grad_spectral(nx,ny,w[2:nx+3,2:ny+3])
     wxx,wxy = grad_spectral(nx,ny,wx)
@@ -488,7 +609,24 @@ def rhs_arakawa(nx,ny,dx,dy,re,w,s,ifm,kappa,max_min,model,ifeat):
         pi_source = np.where(nue_loc_avg_use > 0.0, pi_source[:,:],0.0)
         
         f[2:nx+3,2:ny+3] = -jac + lap/re + pi_source
-                        
+    
+    elif ifm == 3:
+        kconvolve = np.array([[1,1,1],[1,1,1],[1,1,1]])
+        
+        pi_source = dnn_closure(nx,ny,w,s,max_min,model,ifeat)
+        nue = pi_source/lap
+        
+        nue_p = np.where(nue > 0, nue, 0.0)
+        
+        nue_loc_avg = ndimage.convolve(nue_p, kconvolve, mode='mirror')#, cval=0.0)
+        nue_loc_avg = nue_loc_avg/9.0
+        
+        nue_loc_avg_use = np.where(nue_p < nue_loc_avg, nue_p, 0.0)
+        
+        pi_source = np.where(nue_loc_avg_use > 0.0, pi_source[:,:],0.0)
+        
+        f[2:nx+3,2:ny+3] = -jac + lap/re + pi_source
+        
     return f
 
 def jacobian(nx,ny,dx,dy,re,w,s):
