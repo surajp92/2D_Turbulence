@@ -462,23 +462,20 @@ def dnn_closure(nx,ny,w,s,max_min,model,ifeat):
                 x_test[n,19] = ks[i,j]
     if ifeat == 3:
         nt = int((nx+1)*(ny+1))
-        x_test = np.zeros((nt,108))
-        n = 0
-        for i in range(2,nx+3):
-            for j in range(2,ny+3):
-                x_test[n,0:9] = wc[i-1:i+2,j-1:j+2].flatten()
-                x_test[n,9:18] = sc[i-1:i+2,j-1:j+2].flatten()
-                x_test[n,18:27] = wcx[i-1:i+2,j-1:j+2].flatten()
-                x_test[n,27:36] = wcy[i-1:i+2,j-1:j+2].flatten()
-                x_test[n,36:45] = wcxx[i-1:i+2,j-1:j+2].flatten()
-                x_test[n,45:54] = wcyy[i-1:i+2,j-1:j+2].flatten()
-                x_test[n,54:63] = wcxy[i-1:i+2,j-1:j+2].flatten()
-                x_test[n,63:72] = scx[i-1:i+2,j-1:j+2].flatten()
-                x_test[n,72:81] = scy[i-1:i+2,j-1:j+2].flatten()
-                x_test[n,81:90] = scxx[i-1:i+2,j-1:j+2].flatten()
-                x_test[n,90:99] = scyy[i-1:i+2,j-1:j+2].flatten()
-                x_test[n,99:108] = scxy[i-1:i+2,j-1:j+2].flatten()
-                n = n+1
+        x_test = np.zeros((nt,12))
+        
+        x_test[:,0] = wc.flatten()
+        x_test[:,1] = sc.flatten()
+        x_test[:,2] = wcx.flatten()
+        x_test[:,3] = wcy.flatten()
+        x_test[:,4] = wcxx.flatten()
+        x_test[:,5] = wcyy.flatten()
+        x_test[:,6] = wcxy.flatten()
+        x_test[:,7] = scx.flatten()
+        x_test[:,8] = scy.flatten()
+        x_test[:,9] = scxx.flatten()
+        x_test[:,10] = scyy.flatten()
+        x_test[:,11] = scxy.flatten()
                 
     y_pred_sc = model.predict(x_test)
     y_pred = 0.5*(y_pred_sc*(max_min[14,0] - max_min[14,1]) + (max_min[14,0] + max_min[14,1]))
