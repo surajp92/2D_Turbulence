@@ -1,0 +1,13 @@
+# parameters of the 2d homegeneous turbulence problem
+1024		!NXF=NYF; fine resolution
+128		!NX=NY; coarse resolution
+800		!N; number of snapshots
+75		!Ntr: training snapshots
+800		!Nte; test snapshot
+10		!f; frequency
+1		!istencil; 1: single point, 2: nine point, 
+3		!ifeatures; 1: w,s features, 2: w,s,kernels features, 3: 12 features 
+1		!ilabel; 1: SGS (pi), 
+1.6e4		!Re, Reynolds number 
+
+

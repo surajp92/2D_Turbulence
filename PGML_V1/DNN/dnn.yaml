@@ -1,0 +1,15 @@
+# parameters of the 2d homegeneous turbulence problem
+nf : 1024       # NXF=NYF; fine resolution
+nc : 128        # NX=NY; coarse resolution
+ns : 800        # ns: number of snapshots
+sfreq : 5       # frequency at which FDNS snapshots are stored
+ntr : 140       # Ntr: training snapshots
+nte: 800        # Nte; test snapshot
+freq : 5        # f; frequency
+istencil : 1    # istencil; 1: single point, 2: nine point, 
+ifeatures : 3   # ifeatures; 1: w,s features, 2: w,s,kernels features, 3: 12 features 
+ilabel : 1      # ilabel; 1: SGS (pi), 
+Re : 1.6e4      # Re, Reynolds number 
+seedn : 10      # seed for different intilization
+
+

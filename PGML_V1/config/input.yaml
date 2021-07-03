@@ -1,0 +1,27 @@
+# parameters of the 2d homegeneous turbulence problem
+nx : 128         # NXF
+ny : 128         # NYF
+nxc : 128         # NXC
+nyc : 128         # NYC
+re : 1.6e4      # Re, Reynolds number 
+nt : 4000       # NT, number of time step
+dt : 1.0e-3     # dt, time step
+isolver : 1     # isolver; [1]arakawa [2] Central-difference [3] compact
+icompact : 0    # [0] if non-compact [1] fourth-order, [2] sixth-order
+ifm : 3         # [0] No closure [1] DSM [2] CNN [3] ANN
+ipr : 4         # [1]TGV, [2]VM, [3]Shear, [4]Decay 
+ip : 1          # ipoisson; [1]FPS 
+its : 2         # its; [1]Euler [2] RK3
+pfreq : 1       # print frequency
+sfreq : 100       # save frequency
+iapriori : 0    # [0] Do not save coarsen data, [1] Save coarsen data
+iaprsfreq : 5   # save frequency for a priori data
+esplot : 4      # number of energy spectrum
+ichkp : 0       # start from checkpoint
+nschkp : 0   # snapshots to start from
+imovie : 0      # [0] Do not save movie data, [1] Save movie data
+nsmovie : 100   # number of snapshots for movie
+mvchkp : 0      # movie checkpoint
+seedn : 10      # seed for different intilization
+kappa : 2       # DSM parameter
+pCU3 : 0.0      # CU3 parameter
